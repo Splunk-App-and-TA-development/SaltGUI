@@ -16,9 +16,9 @@ export class JobRoute extends Route {
   onShow() {
     const myThis = this;
 
-    const id = decodeURIComponent(Utils.getQueryParam("id"));
+    const jobId = window.sessionStorage.getItem("jobid");
 
-    const runnerJobsListJobPromise = this.router.api.getRunnerJobsListJob(id);
+    const runnerJobsListJobPromise = this.router.api.getRunnerJobsListJob(jobId);
     const runnerJobsActivePromise = this.router.api.getRunnerJobsActive();
 
     runnerJobsListJobPromise.then(pRunnerJobsListJobData => {
@@ -108,9 +108,10 @@ export class JobRoute extends Route {
     const output = this.getPageElement().querySelector(".output");
 
     const closeButton = document.querySelector("#job-button-close");
-    closeButton.addEventListener("click", pClickEvent =>
-      window.history.back()
-    );
+    closeButton.addEventListener("click", pClickEvent => {
+      const routeNr = window.sessionStorage.getItem("back");
+      myThis.router.showRoute(myThis.router.routes[routeNr]);
+    });
 
     const searchButton = this.getPageElement().querySelector("span.search");
     searchButton.addEventListener("click", pClickEvent =>
@@ -335,7 +336,7 @@ export class JobRoute extends Route {
     }.bind(this));
   }
 
-  handleRunnerJobsActive(id, pData) {
+  handleRunnerJobsActive(pJobId, pData) {
     const summaryJobsActiveSpan = this.getPageElement().querySelector("pre.output span#summary-jobs-active");
     if(!summaryJobsActiveSpan) return;
 
@@ -345,7 +346,7 @@ export class JobRoute extends Route {
       return;
     }
 
-    const info = pData.return[0][id];
+    const info = pData.return[0][pJobId];
 
     // when the job is already completely done, nothing is returned
     if(!info) {

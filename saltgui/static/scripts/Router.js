@@ -26,21 +26,21 @@ export class Router {
     this.currentRoute = undefined;
     this.routes = [];
 
-    this._registerRoute(new LoginRoute(this));
-    this._registerRoute(new MinionsRoute(this));
+    this._registerRoute(this.loginRoute = new LoginRoute(this));
+    this._registerRoute(this.minionsRoute = new MinionsRoute(this));
     this._registerRoute(this.keysRoute = new KeysRoute(this));
-    this._registerRoute(new GrainsRoute(this));
-    this._registerRoute(new GrainsMinionRoute(this));
-    this._registerRoute(new SchedulesRoute(this));
-    this._registerRoute(new SchedulesMinionRoute(this));
-    this._registerRoute(new PillarsRoute(this));
-    this._registerRoute(new PillarsMinionRoute(this));
-    this._registerRoute(new BeaconsRoute(this));
+    this._registerRoute(this.grainsRoute = new GrainsRoute(this));
+    this._registerRoute(this.grainsMinionRoute = new GrainsMinionRoute(this));
+    this._registerRoute(this.schedulesRoute = new SchedulesRoute(this));
+    this._registerRoute(this.schedulesMinionRoute = new SchedulesMinionRoute(this));
+    this._registerRoute(this.pillarsRoute = new PillarsRoute(this));
+    this._registerRoute(this.pillarsMinionRoute = new PillarsMinionRoute(this));
+    this._registerRoute(this.beaconsRoute = new BeaconsRoute(this));
     this._registerRoute(this.beaconsMinionRoute = new BeaconsMinionRoute(this));
     this._registerRoute(this.jobRoute = new JobRoute(this));
-    this._registerRoute(new JobsRoute(this));
-    this._registerRoute(new TemplatesRoute(this));
-    this._registerRoute(new OptionsRoute(this));
+    this._registerRoute(this.jobsRoute = new JobsRoute(this));
+    this._registerRoute(this.templatesRoute = new TemplatesRoute(this));
+    this._registerRoute(this.optionsRoute = new OptionsRoute(this));
 
     // show template menu item if templates defined
     const templatesText = window.sessionStorage.getItem("templates");
@@ -53,7 +53,7 @@ export class Router {
 
     this._registerRouterEventListeners();
 
-    this.goTo(window.location.pathname + window.location.search);
+    this.showRoute(this.loginRoute);
   }
 
   _registerRouterEventListeners() {
@@ -61,94 +61,94 @@ export class Router {
       .addEventListener("click", pClickEvent => {
         if(window.location.pathname === "/login") return;
         if(window.event.ctrlKey) {
-          window.location.assign("/options");
+          this.showRoute(this.optionsRoute);
         } else {
-          window.location.assign("/");
+          this.showRoute(this.minionsRoute);
         }
       });
 
     document.querySelector("#button-minions1")
       .addEventListener("click", pClickEvent =>
-        window.location.replace("/")
+        this.showRoute(this.minionsRoute)
       );
     document.querySelector("#button-minions2")
       .addEventListener("click", pClickEvent =>
-        window.location.replace("/")
+        this.showRoute(this.minionsRoute)
       );
 
     document.querySelector("#button-grains1")
       .addEventListener('click', pClickEvent =>
-        window.location.replace("/grains")
+        this.showRoute(this.grainsRoute)
       );
     document.querySelector("#button-grains2")
       .addEventListener('click', pClickEvent =>
-        window.location.replace("/grains")
+        this.showRoute(this.grainsRoute)
       );
 
     document.querySelector("#button-schedules1")
       .addEventListener('click', pClickEvent =>
-        window.location.replace("/schedules")
+        this.showRoute(this.schedulesRoute)
       );
     document.querySelector("#button-schedules2")
       .addEventListener('click', pClickEvent =>
-        window.location.replace("/schedules")
+        this.showRoute(this.schedulesRoute)
       );
 
     document.querySelector("#button-pillars1")
       .addEventListener('click', pClickEvent =>
-        window.location.replace("/pillars")
+        this.showRoute(this.pillarsRoute)
       );
     document.querySelector("#button-pillars2")
       .addEventListener('click', pClickEvent =>
-        window.location.replace("/pillars")
+        this.showRoute(this.pillarsRoute)
       );
 
     document.querySelector("#button-beacons1")
       .addEventListener('click', pClickEvent =>
-        window.location.replace("/beacons")
+        this.showRoute(this.beaconsRoute)
       );
     document.querySelector("#button-beacons2")
       .addEventListener('click', pClickEvent =>
-        window.location.replace("/beacons")
+        this.showRoute(this.beaconsRoute)
       );
 
     document.querySelector("#button-keys1")
       .addEventListener("click", pClickEvent =>
-        window.location.replace("/keys")
+        this.showRoute(this.keysRoute)
       );
     document.querySelector("#button-keys2")
       .addEventListener("click", pClickEvent =>
-        window.location.replace("/keys")
+        this.showRoute(this.keysRoute)
       );
 
     document.querySelector("#button-jobs1")
       .addEventListener('click', pClickEvent =>
-        window.location.replace("/jobs")
+        this.showRoute(this.jobsRoute)
       );
     document.querySelector("#button-jobs2")
       .addEventListener('click', pClickEvent =>
-        window.location.replace("/jobs")
+        this.showRoute(this.jobsRoute)
       );
 
     document.querySelector("#button-templates1")
       .addEventListener('click', pClickEvent =>
-        window.location.replace("/templates")
+        this.showRoute(this.templatesRoute)
       );
     document.querySelector("#button-templates2")
       .addEventListener('click', pClickEvent =>
-        window.location.replace("/templates")
+        this.showRoute(this.templatesRoute)
       );
 
     document.querySelector("#button-logout1")
       .addEventListener("click", pClickEvent => {
         this.api.logout().then(
-          pLogoutData => window.location.replace("/login?reason=logout"));
-      });
+          pLogoutData => this.showRoute(this.loginRoute, {"reason": "logout"})
+        );});
     document.querySelector("#button-logout2")
       .addEventListener("click", pClickEvent => {
         this.api.logout().then(
-          pLogoutData => window.location.replace("/login?reason=logout"));
-      });
+          pLogoutData => this.showRoute(this.loginRoute, {"reason": "logout"})
+        );});
 
     // don't verify the session too often
     setInterval(this._logoutTimer, 60000);
@@ -182,7 +182,7 @@ export class Router {
       if(!route.getPath().test(pPath.split("?")[0])) continue;
       // push history state for login (including redirect to /)
       if(pPath === "/login" || pPath === "/") window.history.pushState({}, undefined, pPath);
-      this._showRoute(route);
+      this.showRoute(route, { });
       return;
     }
     // route could not be found
@@ -190,8 +190,12 @@ export class Router {
     this.goTo("/");
   }
 
-  _showRoute(pRoute) {
+  showRoute(pRoute, pParameters) {
     const myThis = this;
+
+    for(const key in pParameters) {
+      window.sessionStorage.setItem(key, pParameters[key]);
+    }
 
     pRoute.getPageElement().style.display = "";
 
@@ -232,22 +236,26 @@ export class Router {
     // it is either not started, or needs restarting
     this.api.getEvents(this);
 
-    if(myThis.currentRoute) {
+    if(myThis.currentRoute && pRoute !== myThis.currentRoute) {
       myThis._hideRoute(myThis.currentRoute);
     }
 
     myThis.currentRoute = pRoute;
-    myThis.currentRoute.getPageElement().className = "route current";
+    document.title = "SaltGUI - " + myThis.currentRoute.getName();
+    myThis.currentRoute.getPageElement().classList.add("current");
+
     myThis.switchingRoute = false;
   }
 
   _hideRoute(pRoute) {
     pRoute.getPageElement().className = "route";
+    const page = pRoute.getPageElement();
+    page.classList.remove("current");
+    // 500ms matches the timeout in main.css (.route)
     setTimeout(function() {
       // Hide element after fade, so it does not expand the body
-      pRoute.getPageElement().style.display = "none";
+      page.style.display = "none";
     }, 500);
-    if(pRoute.onHide) pRoute.onHide();
   }
 
 }

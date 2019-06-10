@@ -8,6 +8,9 @@ export class MinionsRoute extends PageRoute {
   constructor(pRouter) {
     super("^[\/]$", "Minions", "#page-minions", "#button-minions", pRouter);
 
+    Utils.showTableSortable(this.getPageElement());
+    Utils.makeTableSearchable(this.getPageElement());
+
     this._handleMinionsWheelKeyListAll = this._handleMinionsWheelKeyListAll.bind(this);
 
     Utils.makeTableSortable(this.getPageElement());
@@ -22,6 +25,7 @@ export class MinionsRoute extends PageRoute {
     const runnerJobsListJobsPromise = this.router.api.getRunnerJobsListJobs();
     const runnerJobsActivePromise = this.router.api.getRunnerJobsActive();
 
+    this.cleanTableAndStatus("minion-list");
     wheelKeyListAllPromise.then(pWheelKeyListAllData => {
       myThis._handleMinionsWheelKeyListAll(pWheelKeyListAllData);
       localGrainsItemsPromise.then(pLocalGrainsItemsData => {
@@ -37,6 +41,7 @@ export class MinionsRoute extends PageRoute {
       myThis._handleMinionsWheelKeyListAll(JSON.stringify(pWheelKeyListAllMsg));
     });
 
+    this.cleanTableAndStatus("job-list");
     runnerJobsListJobsPromise.then(pRunnerJobsListJobsData => {
       myThis.handleRunnerJobsListJobs(pRunnerJobsListJobsData);
       runnerJobsActivePromise.then(pRunnerJobsActiveData => {

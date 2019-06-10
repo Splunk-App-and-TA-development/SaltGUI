@@ -13,6 +13,9 @@ export class PageRoute extends Route {
     this.startRunningJobs = this.startRunningJobs.bind(this);
     this.handleRunnerJobsListJobs = this.handleRunnerJobsListJobs.bind(this);
     this.updateMinions = this.updateMinions.bind(this);
+
+    const page = this.getPageElement().querySelector(".job-list");
+    Utils.makeTableSearchable(page);
   }
 
   updateMinions(pData) {
@@ -528,22 +531,25 @@ export class PageRoute extends Route {
 
     pContainer.appendChild(tr);
 
+    const myThis = this;
     tr.addEventListener("click", pClickEvent =>
-      window.location.assign("/job?id=" + encodeURIComponent(job.id))
+      myThis.router.showRoute(myThis.router.jobRoute, {"jobid": job.id, "back": myThis.router.routes.indexOf(myThis)})
     );
   }
 
   _addPageMenuItemShowDetails(pMenu, job) {
+    const myThis = this;
     pMenu.addMenuItem("Show&nbsp;details", function(pClickEvent) {
-      window.location.assign("/job?id=" + encodeURIComponent(job.id));
+      myThis.router.showRoute(myThis.router.jobRoute, {"jobid": job.id, "back": myThis.router.routes.indexOf(myThis)});
     }.bind(this));
   }
 
   _addPageMenuItemUpdateStatus(pMenu, statusSpan) {
+    const myThis = this;
     pMenu.addMenuItem("Update&nbsp;status", function(pClickEvent) {
       statusSpan.classList.add("no-status");
       statusSpan.innerText = "loading...";
-      this.startRunningJobs();
+      myThis._startRunningJobs();
     }.bind(this));
   }
 
@@ -625,5 +631,15 @@ export class PageRoute extends Route {
     if(msgDiv !== null) msgDiv.style.display = "none";
 
     return true;
+  }
+
+  cleanTableAndStatus(pageName) {
+    const page = this.getPageElement().querySelector("." + pageName);
+    const tbody = page.querySelector("table tbody");
+    // remove all rows
+    tbody.innerHTML = "";
+    const msg = page.querySelector(".msg");
+    // remove previous summry
+    msg.innerText = "(loading)";
   }
 }
