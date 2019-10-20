@@ -35,4 +35,7 @@ npm run wait-for-docker
 export NIGHTMARE_DEBUG=1
 npm run test:functional
 
+ls -al /home/travis/.npm/_logs/
+cat  /home/travis/.npm/_logs/*-debug.log
+
 set +e
