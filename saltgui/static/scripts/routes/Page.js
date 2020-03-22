@@ -21,7 +21,6 @@ export class PageRoute extends Route {
     const minions = pData.return[0];
 
     const table = this.getPageElement().querySelector("#minions");
-console.log(minions);
     const minionIds = Object.keys(minions).sort();
 
     const minionsTxt = JSON.parse(window.sessionStorage.getItem("minions-txt"));
