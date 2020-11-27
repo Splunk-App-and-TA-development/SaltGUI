@@ -125,9 +125,12 @@ export class DropDownMenu {
     return button;
   }
 
-  _callback (pClickEvent, pCallBack, pValue) {
+  _callback (pCallBack, pValue) {
     this._value = pValue;
-    pCallBack(pClickEvent);
+    pCallBack();
+    // just in case the menu remains visible
+    // and has items that change visibility
+    this.verifyAll();
   }
 
   setTitle (pTitle) {
