@@ -2,6 +2,9 @@
 
 A new open source web interface for managing a SaltStack server. Built using vanilla ES6 and implemented as a wrapper around the rest_cherrypy server.
 
+The version tagged `release` is the latest released version. The version `master` should be fine, but it may contain changes that are not yet in these release-notes.
+
+
 ## Screenshots
 ![overview](/docs/screenshots/overview.png)
 
@@ -18,7 +21,11 @@ A new open source web interface for managing a SaltStack server. Built using van
 - View the schedules for a particular minion
 - View the values for pillars for a particular minion
 - View the beacons for a particular minion
+- View the events on the salt-event bus
+- View internal documentation for any salt command
+- View external documentation for any salt command
 - Match list of minions against reference list
+- Match status of minions against reference list
 
 
 ## Quick start using PAM as authentication method
@@ -165,6 +172,27 @@ saltgui_public_pillars:
     - pub_.*
 ```
 
+## Reduced menus
+When api's are disabled using the native `external_auth` mechanism,
+SaltGUI may show menu-items that have become unuseable.
+In that case, it may be useful to reduce the menu-bar to less items.
+Variable `saltgui_pages` is read 
+from salt master configuration file `/etc/salt/master`.
+It contains the list of accessible pages per user.
+The first page in the list also becomes the landing page.
+Users that are not listed still have the full menu.
+e.g.:
+```
+saltgui_pages:
+  user1:
+    - keys
+    - grains
+```
+Note that this is NOT a security mechanism to reduce what a user can do.
+All pages are still accessible using their original deep-link.
+And also any command can still be issued using the command-box.
+For real security measures, use parameter `external_auth`.
+
 ## Performance
 SaltGUI does not have artificial restrictions.
 But displaying all data may be slow when there is a lot of data.
@@ -183,17 +211,22 @@ The only other allowed value is "none", with the effect that no tooltips are sho
 In situations like cloud hosting, hosts may be deleted or shutdown frequently.
 But Salt remembers the key status from both.
 SaltGUI can compare the list of keys against a reference list.
-The reference list is maintained as a text file, one minion-name per line.
+The reference list is maintained as a text file, one minion per line.
+First column is the minion name.
+Second column is 'false' when the minion is known to be absent due to machine shutdown.
+It should be 'true' otherwise.
+When the second column is missing, this validation is not performed.
 Lines starting with '#' are comment lines.
 The filename is `saltgui/static/minions.txt`.
-All differences with this file are highlighted on the Keys page.
+Differences with this file are highlighted on the Keys page.
+Minions that are unexpectedly down are highlighted on the Minions page.
 When the file is absent or empty, no such validation is done.
 It is suggested that the file is generated from a central source,
 e.g. the Azure, AWS or similar cloud portals; or from a company asset management list.
 
 ## Separate SaltGUI host
 In some specific environments you might not be able to serve SaltGUI directly from salt-api.
-In that case you might want to configure a web server (for example NGINX) to serve SaltGui 
+In that case you might want to configure a web server (for example NGINX) to serve SaltGui
 and use it as proxy to salt-api so that requests are answered from the same origin from the browser point of view.
 
 Sample NGINX configuration might look like this:
@@ -223,14 +256,17 @@ server {
 }
 ```
 
-The value of the `API_URL` in the `config.js` file shall point to path where salt-api is exposed. 
+The value of the `API_URL` in the `config.js` file must point to path where salt-api is exposed.
+The value of the `NAV_URL` in the `config.js` file must point to path where the SaltGUI application is exposed.
 ```
 const config = {
-  API_URL: '/api'
+  API_URL: '/api',
+  NAV_URL: '/app'
 };
 ```
+Note that the main page of SaltGUI is then located at '/app/'. When you want '/app' to work as well, you should instruct an intermediate proxy server to translate '/app' into '/app/'.
 
-> Currenlty you can't use totally independent salt-api without proxy as support for CORS preflight request is not properly support.
+> Currently you can't use totally independent salt-api without proxy as support for CORS preflight request is not properly support.
 
 ## Development environment with Docker
 To make life a bit easier for testing SaltGUI or setting up a local development environment you can use the provided docker-compose setup in this repository to run a saltmaster with three minions, including SaltGUI:
@@ -254,7 +290,7 @@ NIGHTMARE_DEBUG=1 ./runtests.sh
 
 We use the following testing libraries:
 - [nightmare.js](https://github.com/segmentio/nightmare), for functional/browser tests
-- [mocha](https://https://mochajs.org/), a well documented testing framework for javascript
+- [mocha](https://mochajs.org/), a well documented testing framework for javascript
 - [chai](http://www.chaijs.com/), the preferred assertion library for testing
 
 You'll need at least:
@@ -277,6 +313,66 @@ SaltGUI includes these libraries (with possible modifications):
 
 
 ## Changelog
+
+## 1.23.0 (2020-12-28)
+- warn when there are no matching targets (erwindon)
+- added basic support for reactors (erwindon)
+- added support to add all 3 schedule types (erwindon)
+- consider the state_verbose and state_output variables (erwindon)
+- async (highstate) jobs now provide feeback about progress (erwindon)
+- added support for bulk state apply (erwindon)
+- added support for bulk key management (erwindon)
+- prefer js escape codes over html escape codes (erwindon)
+- centralized special character handling (erwindon)
+- restyled the top-right cmd-button (erwindon, thx dawidmalina)
+- wheel commands can only take named parameters (erwindon)
+- let pages decide on their own visibility (erwindon)
+- better support for touchscreens (erwindon)
+- show cherrypy details on (hidden) screen (ewindon)
+- improved session timeout detection (erwindon)
+- improved (hidden) options screen (erwindon)
+- reduce update-rate of jobs overview, now interruptable (erwindon)
+- cleaned code for dropdown menus (erwindon)
+- small fixes for sonarqube results (erwindon)
+- small fixes for layout and spelling (erwindon)
+- Celebrating (almost) 250 stars on GitHub
+
+## 1.22.0 (2020-11-05)
+- added alert for all known CVEs (erwindon)
+- added external documentation access (erwindon)
+- improved support for multiple message beacons (erwindon)
+- added play/pause buttons for dynamic screens (erwindon)
+- use more util functions for common tasks (erwindon)
+- reorganized code in pages and panels (erwindon)
+- improved support for very old browsers (erwindon)
+- replaceAll is not universally supported (erwindon, thx Timbus)
+- added support for """strings""" (erwindon, thx jfunnell)
+- modernized js code (erwindon)
+- fixed whitespace situations with commands (erwindon)
+- additional eslint fixes (erwindon)
+- update of tools (erwindon)
+- small documentation fixes (erwindon)
+
+## 1.21.0 (2020-08-02)
+- added event-monitoring page (erwindon, thx mchugh19)
+- added search-options (erwindon, thx mchugh19)
+- upgraded eslint to 7.5; applied most rules (erwindon)
+- warn for imminent session timout (erwindon)
+- simplified html object selection (erwindon)
+- unified search handling (erwindon)
+- mark current choice in selection menus (erwindon)
+
+## 1.20.0 (2020-05-22)
+- Cleanup handling of urls; allow alternative prefixes (erwindon, thx ggiesen)
+- Now supporting list of minion that are known to be down (erwindon)
+- Verify master/minion versions and highlight problems and differences (erwindon)
+- Bumped docker images to latest version (erwindon)
+- Small consistency updates for Options screen (erwindon)
+- Fix Templates screen in case there are no templates (erwindon)
+- Explain that some beacons send multiple values, but we view only the latest (erwindon)
+- Support beacons that provide an extended tag name (erwindon)
+- Fixed menus for rows in Keys screen when key status changes (erwindon)
+- Improved unit tests (erwindon)
 
 ## 1.19.1 (2020-03-09)
 - Match minions against external reference list (erwindon)
@@ -472,7 +568,7 @@ SaltGUI includes these libraries (with possible modifications):
 ## 1.0.1 (2018-05-16)
 - Fixed position of popup when main window has scrolled (erwindon)
 - Sort minions by hostname (erwindon)
-- Fixed OS description in minion overview (No lsb_distrib_description)(erwindon)
+- Fixed OS description in minion overview (No lsb_distrib_description) (erwindon)
 - Now sort the jobs correctly on ``StartDate`` in the overview window
 
 ## 1.0.0 (2018-03-07)

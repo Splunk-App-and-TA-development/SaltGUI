@@ -1,50 +1,142 @@
-import {Route} from './routes/Route.js';
+/* global console document Hilitor window */
+
+import {Character} from "./Character.js";
+import {DropDownMenu} from "./DropDown.js";
 
 export class Utils {
 
-  static _getQueryParam2(pUrl, pName) {
+  // functions for URL parameters
+
+  static _getQueryParam2 (pUrl, pName) {
+    const hashPos = pUrl.indexOf("#");
+    if (hashPos > 0) {
+      pUrl = pUrl.substring(0, hashPos);
+    }
     const questionmarkPos = pUrl.indexOf("?");
-    if(questionmarkPos < 0) return undefined;
+    if (questionmarkPos < 0) {
+      return undefined;
+    }
     const parameters = pUrl.slice(questionmarkPos + 1).split("&");
-    for(const parameter of parameters) {
+    for (const parameter of parameters) {
       const namevalue = parameter.split("=");
-      if(namevalue.length !== 2) continue;
-      if(namevalue[0] === pName) return namevalue[1];
+      if (namevalue.length !== 2) {
+        continue;
+      }
+      if (namevalue[0] === pName) {
+        return namevalue[1];
+      }
     }
     return undefined;
   }
 
-  /* istanbul ignore next */
-  static getQueryParam(pName) {
-    let w = null;
-    try { w = window; } catch(error) { /* VOID */ }
-    if(!w || !w.location) return undefined;
-    return Utils._getQueryParam2(w.location.href, pName);
+  static getQueryParam (pName) {
+    let theWindow = null;
+    try {
+      theWindow = window;
+    } catch (error) {
+      // VOID
+    }
+    if (!theWindow || !theWindow.location) {
+      return undefined;
+    }
+    /* istanbul ignore next */
+    return Utils._getQueryParam2(theWindow.location.href, pName);
   }
 
-  static addToolTip(pTooltipHost, pTooltipText, pStyle="bottom-center") {
+  // functions for storage handling
+
+  static _getStorage (pStorage) {
+    // "window" is not defined during unit testing
+    try {
+      /* eslint-disable no-unused-vars */
+      const theWindow = window;
+      /* eslint-enable no-unused-vars */
+    } catch (error) {
+      return null;
+    }
+    /* istanbul ignore next */
+    if (pStorage === "local") {
+      return window.localStorage;
+    }
+    /* istanbul ignore next */
+    if (pStorage === "session") {
+      return window.sessionStorage;
+    }
+    /* istanbul ignore next */
+    console.error("UNKNOWN STORAGE TYPE", pStorage);
+    /* istanbul ignore next */
+    return null;
+  }
+
+  static getStorageItem (pStorage, pKeyName, pDefaultValue = null) {
+    const storage = Utils._getStorage(pStorage);
+    if (!storage) {
+      console.log("getStorageItem", pStorage, pKeyName);
+      return pDefaultValue;
+    }
+    /* istanbul ignore next */
+    const value = storage.getItem(pKeyName);
+    // console.log("getStorageItem", pStorage, pKeyName, pDefaultValue, "-->", typeof value, value);
+    /* istanbul ignore next */
+    if (value === null) {
+      return pDefaultValue;
+    }
+    /* istanbul ignore next */
+    if (value === "undefined") {
+      return pDefaultValue;
+    }
+    /* istanbul ignore next */
+    return value;
+  }
+
+  static setStorageItem (pStorage, pKeyName, pValue) {
+    const storage = Utils._getStorage(pStorage);
+    if (!storage) {
+      console.log("setStorageItem", pStorage, pKeyName, pValue);
+      return;
+    }
+    // console.log("setStorageItem", pStorage, pKeyName, pValue);
+    /* istanbul ignore next */
+    storage.setItem(pKeyName, pValue);
+  }
+
+  static clearStorage (pStorage) {
+    const storage = Utils._getStorage(pStorage);
+    if (!storage) {
+      console.log("clearStorage", pStorage);
+      return;
+    }
+    // console.log("clearStorage", pStorage);
+    /* istanbul ignore next */
+    storage.clear();
+  }
+
+  // other functions
+
+  static addToolTip (pTooltipHost, pTooltipText, pStyle = "bottom-center") {
 
     // Users may want to switch this on to improve browser performance
-    const toolTipMode = window.sessionStorage.getItem("tooltip_mode");
+    const toolTipMode = Utils.getStorageItem("session", "tooltip_mode");
 
-    if(toolTipMode === "none") {
+    if (toolTipMode === "none") {
       return;
     }
 
-    if(toolTipMode === "simple") {
+    if (toolTipMode === "simple") {
       pTooltipHost.setAttribute("title", pTooltipText);
       return;
     }
 
-    const tooltipSpan = Route.createSpan("", pTooltipText);
+    // null or "full" (or anything else)
+    const tooltipSpan = Utils.createSpan("", pTooltipText);
     tooltipSpan.classList.add("tooltip-text");
     tooltipSpan.classList.add("tooltip-text-" + pStyle);
     pTooltipHost.classList.add("tooltip");
 
     // remove the old tooltip...
-    for(let i = pTooltipHost.children.length - 1; i >= 0; i--) {
+    for (let i = pTooltipHost.children.length - 1; i >= 0; i--) {
       const child = pTooltipHost.children[i];
-      if(child.classList.contains("tooltip-text")) {
+      if (child.classList.contains("tooltip-text")) {
         pTooltipHost.removeChild(child);
       }
     }
@@ -53,107 +145,252 @@ export class Utils {
     pTooltipHost.appendChild(tooltipSpan);
   }
 
-  static makeTableSortable(pStartElement, pIsReverseSort=false, pColumnNr=0) {
-    const thArr = Array.prototype.slice.call(pStartElement.querySelectorAll("table th"));
-    // we do not expect any rows in the table at this moment
-    // but sorting is applied to show the sorting indicator
-    sorttable.innerSortFunction.apply(thArr[pColumnNr], []);
-    if(pIsReverseSort) sorttable.innerSortFunction.apply(thArr[pColumnNr], []);
-    for(const th of thArr) {
-      if(th.classList.contains("sorttable_nosort")) continue;
-      // the tooltip is too bulky to use, skip for now
-      //Utils.addToolTip(th, "Click to sort");
-    }
-  }
-
-  static addErrorToTableCell(pTd, pErrorMessage) {
-    const span = Route.createSpan("", "(error)");
+  static addErrorToTableCell (pTd, pErrorMessage) {
+    const span = Utils.createSpan("", "(error)");
     Utils.addToolTip(span, pErrorMessage, "bottom-left");
     pTd.appendChild(span);
   }
 
-  static hasTextContent(pElement, pSearchText) {
-    if(pElement.classList && pElement.classList.contains("run-command-button"))
+  static _hasTextContent (pElement, pSearchText, pCaseSensitiveFlag) {
+
+    // why?
+    if (pElement.classList && pElement.classList.contains("run-command-button")) {
       return false;
-    for(const childNode of pElement.childNodes)
-      if(this.hasTextContent(childNode, pSearchText))
-        return true;
-    if(pElement.nodeType !== 3) // NODE_TEXT
-      return false;
-    return pElement.textContent.toUpperCase().includes(pSearchText);
+    }
+
+    let found = false;
+    for (const childNode of pElement.childNodes) {
+      const searchResult = Utils._hasTextContent(childNode, pSearchText, pCaseSensitiveFlag);
+      if (searchResult === 2) {
+        return 2;
+      }
+      if (searchResult === 1) {
+        found = true;
+      }
+    }
+    if (found) {
+      return 1;
+    }
+
+    // NODE_TEXT
+    if (pElement.nodeType !== 3) {
+      return 0;
+    }
+
+    let textValue = pElement.textContent;
+    if (typeof pSearchText === "string") {
+      if (!pCaseSensitiveFlag) {
+        textValue = textValue.toUpperCase();
+      }
+      return textValue.includes(pSearchText) ? 1 : 0;
+    }
+
+    // then it is a RegExp
+    const regs = pSearchText.exec(textValue);
+    if (!regs) {
+      return 0;
+    }
+    return regs[0].length > 0 ? 1 : 2;
   }
 
-  static makeTableSearchable(pStartElement) {
-    const searchButton = Route.createSpan("search", "");
-    // 1F50D = LEFT-POINTING MAGNIFYING GLASS
-    // FE0E = VARIATION SELECTOR-15 (render as text)
-    searchButton.innerHTML = "&#x1f50d;&#xFE0E;";
-    searchButton.onclick = ev =>
-      Utils._hideShowTableSearchBar(pStartElement);
-    const table = pStartElement.querySelector("table");
-    table.parentElement.insertBefore(searchButton, table);
+  static makeSearchBox (pSearchButton, pTable, pFieldList = null) {
+
+    const div = Utils.createDiv("search-box", "");
+    div.style.display = "none";
+
+    const menuAndFieldDiv = Utils.createDiv("search-menu-and-field", "");
+
+    const searchOptionsMenu = new DropDownMenu(menuAndFieldDiv);
+
+    const input = document.createElement("input");
+    input.type = "text";
+    input.classList.add("filter-text");
+    input.placeholder = Character.LEFT_POINTING_MAGNIFYING_GLASS_COLOUR;
+    if (pFieldList) {
+      input.setAttribute("list", pFieldList);
+    }
+    menuAndFieldDiv.append(input);
+
+    div.append(menuAndFieldDiv);
+
+    const errorDiv = Utils.createDiv("search-error", "");
+    errorDiv.style.display = "none";
+    div.append(errorDiv);
+
+    searchOptionsMenu.addMenuItem(
+      "Case sensitive", (ev) => {
+        Utils._updateSearchOption(ev, pTable, searchOptionsMenu, input);
+      });
+    searchOptionsMenu.addMenuItem(
+      "Regular expression", (ev) => {
+        Utils._updateSearchOption(ev, pTable, searchOptionsMenu, input);
+      });
+    searchOptionsMenu.addMenuItem(
+      "Invert search", (ev) => {
+        Utils._updateSearchOption(ev, pTable, searchOptionsMenu, input);
+      });
+
+    // make the search function active
+    pSearchButton.onclick = () => {
+      Utils.hideShowTableSearchBar(div, pTable);
+    };
+
+    return div;
   }
 
-  static addTableHelp(pStartElement, pHelpText, pStyle="bottom-right") {
+  static _updateSearchOption (ev, pTable, pSearchOptionsMenu, pInput) {
+    ev.target._value = !ev.target._value;
+
+    let menuItemText = ev.target.innerText;
+    menuItemText = menuItemText.replace(/^. /, "");
+    if (ev.target._value === true) {
+      menuItemText = Character.HEAVY_CHECK_MARK + " " + menuItemText;
+    }
+    ev.target.innerText = menuItemText;
+
+    Utils._updateTableFilter(
+      pTable,
+      pInput.value,
+      pSearchOptionsMenu.menuDropdownContent);
+
+    let placeholder = Character.LEFT_POINTING_MAGNIFYING_GLASS_COLOUR;
+    if (pSearchOptionsMenu.menuDropdownContent.childNodes[0]._value === true) {
+      placeholder += " caseSensitive";
+    }
+    if (pSearchOptionsMenu.menuDropdownContent.childNodes[1]._value === true) {
+      placeholder += " regExp";
+    }
+    if (pSearchOptionsMenu.menuDropdownContent.childNodes[2]._value === true) {
+      placeholder += " invertSearch";
+    }
+    pInput.placeholder = placeholder;
+  }
+
+  static addTableHelp (pStartElement, pHelpText, pStyle = "bottom-right") {
     const helpButton = pStartElement.querySelector("#help");
-    helpButton.classList.add("search");
+    helpButton.classList.add("search-button");
     Utils.addToolTip(helpButton, pHelpText, pStyle);
   }
 
-  static _hideShowTableSearchBar(pStartElement) {
+  static hideShowTableSearchBar (pSearchBlock, pTable, pAction = "toggle") {
+    const startElement = pTable.parentElement;
+
     // remove all highlights
-    const hilitor = new Hilitor(pStartElement, "table tbody");
+    const searchInSelector = pTable.tagName === "TABLE" ? "tbody" : "";
+    const hilitor = new Hilitor(pTable, searchInSelector);
     hilitor.remove();
 
     // show rows in all tables
-    const allFM = pStartElement.querySelectorAll("table .no-filter-match");
-    for(const fm of allFM)
+    const allFM = pTable.querySelectorAll(".no-filter-match");
+    for (const fm of allFM) {
       fm.classList.remove("no-filter-match");
+    }
 
-    const table = pStartElement.querySelector("table");
+    const menuItems = startElement.querySelector(".search-box .menu-dropdown-content");
 
-    // hide/show search box
-    const input = pStartElement.querySelector("input.filter-text");
-    input.onkeyup = ev => {
-      if(ev.key === "Escape") {
-        Utils._updateTableFilter(table, "");
-        Utils._hideShowTableSearchBar(pStartElement);
-        return;
+    // hide/show search box (the block may become more complicated later)
+    const input = pSearchBlock.querySelector("input");
+    input.onkeyup = (ev) => {
+      if (ev.key === "Escape") {
+        Utils._updateTableFilter(pTable, "", menuItems);
+        Utils.hideShowTableSearchBar(pSearchBlock, pTable);
+        // return;
       }
     };
-    input.oninput = ev =>
-      Utils._updateTableFilter(table, input.value);
+    input.oninput = () => {
+      Utils._updateTableFilter(pTable, input.value, menuItems);
+    };
 
-    table.parentElement.insertBefore(input, table);
-    if(input.style.display === "none") {
-      Utils._updateTableFilter(table, input.value);
-      input.style.display = "";
+    pTable.parentElement.insertBefore(pSearchBlock, pTable);
+    if (pAction === "refresh" && pSearchBlock.style.display === "none") {
+      Utils._updateTableFilter(pTable, "", menuItems);
+    } else if (pAction === "refresh") {
+      Utils._updateTableFilter(pTable, input.value, menuItems);
+    } else if (pSearchBlock.style.display === "none") {
+      Utils._updateTableFilter(pTable, input.value, menuItems);
+      pSearchBlock.style.display = "";
     } else {
-      Utils._updateTableFilter(table, "");
-      input.style.display = "none";
+      Utils._updateTableFilter(pTable, "", menuItems);
+      pSearchBlock.style.display = "none";
     }
     input.focus();
   }
 
-  static _updateTableFilter(pTable, pSearchText) {
+  static _updateTableFilter (pTable, pSearchText, pMenuItems) {
     // remove highlighting before re-comparing
     // as it affects the texts
-    const hilitor = new Hilitor(pTable, "tbody");
+    const searchInSelector = pTable.tagName === "TABLE" ? "tbody" : "";
+    const hilitor = new Hilitor(pTable, searchInSelector);
     hilitor.remove();
 
+    // values may be undefined, so convert to proper boolean
+    const caseSensitiveFlag = pMenuItems.childNodes[0]._value === true;
+    const regExpFlag = pMenuItems.childNodes[1]._value === true;
+    let invertFlag = pMenuItems.childNodes[2]._value === true;
+
+    // otherwise everything is immediatelly hidden
+    if (invertFlag && !pSearchText) {
+      invertFlag = false;
+    }
+
     // find text
-    pSearchText = pSearchText.toUpperCase();
-    for(const row of pTable.tBodies[0].rows) {
+    if (!caseSensitiveFlag && !regExpFlag) {
+      pSearchText = pSearchText.toUpperCase();
+    }
+
+    let regexp = undefined;
+
+    const errorBox = pTable.parentElement.querySelector(".search-error");
+    if (regExpFlag) {
+      try {
+        regexp = new RegExp(pSearchText, caseSensitiveFlag ? "" : "i");
+      } catch (err) {
+        errorBox.innerText = err.message;
+        errorBox.style.display = "";
+        return;
+      }
+    }
+    errorBox.style.display = "none";
+
+    const searchParam = regExpFlag ? regexp : pSearchText;
+    let hasEmptyMatches = false;
+    let hasNonEmptyMatches = false;
+    const blocks = pTable.tagName === "TABLE" ? pTable.tBodies[0].rows : pTable.children;
+    for (const row of blocks) {
+      if (row.classList.contains("no-search")) {
+        continue;
+      }
       let show = false;
-      for(const cell of row.cells) {
+      const items = row.tagName === "TR" ? row.cells : [row];
+      for (const cell of items) {
         // do not use "innerText"
         // that one does not handle hidden text
-        if(Utils.hasTextContent(cell, pSearchText)) show = true;
+        const res = Utils._hasTextContent(cell, searchParam, caseSensitiveFlag);
+        if (res === 1) {
+          hasNonEmptyMatches = true;
+        }
+        if (res === 2) {
+          hasEmptyMatches = true;
+        }
+        // don't exit the loop, there might also be empty matches
+        if (res) {
+          show = true;
+        }
       }
-      if(show)
+      if (invertFlag) {
+        show = !show;
+      }
+      if (show) {
         row.classList.remove("no-filter-match");
-      else
+      } else {
         row.classList.add("no-filter-match");
+      }
+    }
+    if (pSearchText && hasEmptyMatches) {
+      const indicator = hasNonEmptyMatches ? "also" : "only";
+      errorBox.innerText = "warning: there were " + indicator + " empty matches, highlighting is not performed";
+      errorBox.style.display = "";
+      return;
     }
 
     // show the result
@@ -161,22 +398,34 @@ export class Utils {
     hilitor.setEndRegExp(/^$/);
     hilitor.setBreakRegExp(/^$/);
 
-    // turn the text into a regexp
-    let pattern = "";
-    for(const chr of pSearchText) {
-      if((chr >= 'A' && chr <= 'Z') || (chr >= '0' && chr <= '9'))
-        pattern += chr;
-      else
-        pattern += "\\" + chr;
+    let pattern;
+    if (regExpFlag) {
+      pattern = pSearchText;
+    } else {
+      // turn the text into a regexp
+      pattern = "";
+      for (const chr of pSearchText) {
+        // prevent accidental construction of character classes
+        /* eslint-disable no-extra-parens */
+        if ((chr >= "A" && chr <= "Z") || (chr >= "a" && chr <= "z") || (chr >= "0" && chr <= "9")) {
+          pattern += chr;
+        } else {
+          pattern += "\\" + chr;
+        }
+        /* eslint-enable no-extra-parens */
+      }
     }
 
-    hilitor.apply(pattern);
+    hilitor.apply(pattern, caseSensitiveFlag);
   }
 
-  static txtZeroOneMany(pCnt, pZeroText, pOneText, pManyText) {
+  static txtZeroOneMany (pCnt, pZeroText, pOneText, pManyText) {
     let txt = pManyText;
-    if(pCnt === 0) txt = pZeroText;
-    if(pCnt === 1) txt = pOneText;
+    if (pCnt === 0 || pCnt === undefined) {
+      txt = pZeroText;
+    } else if (pCnt === 1) {
+      txt = pOneText;
+    }
     txt = txt.replace("{0}", pCnt);
     return txt;
   }
@@ -184,30 +433,75 @@ export class Utils {
   // MinionIds cannot directly be used as IDs for HTML elements
   // the id may contain characters that are not allowed in an ID
   // btoa is the base64 encoder
-  static getIdFromMinionId(pMinionId) {
-    const patEqualSigns = /==*/;
-    return "m" + btoa(pMinionId).replace(patEqualSigns, "");
+  static getIdFromMinionId (pMinionId) {
+    // prevent eslint: A regular expression literal can be confused with '/='
+    const patEqualSigns = /[=]=*/;
+    return "m" + window.btoa(pMinionId).replace(patEqualSigns, "");
   }
 
   // JobIds are in the format 20190529175411210984
   // so just adding a prefix is sufficient
-  static getIdFromJobId(pJobId) {
+  static getIdFromJobId (pJobId) {
     return "j" + pJobId;
   }
 
-  static isMultiLineString(pStr) {
-    if(pStr.includes("\r")) return true;
-    if(pStr.includes("\n")) return true;
+  static isMultiLineString (pStr) {
+    if (pStr.includes("\r")) {
+      return true;
+    }
+    if (pStr.includes("\n")) {
+      return true;
+    }
     return false;
   }
 
-  static createJobStatusSpan(pJobId) {
-    const span = Route.createSpan("", "");
-    // 21BB = CLOCKWISE OPEN CIRCLE ARROW
-    span.innerHTML = "&#x21BB;&nbsp;";
-    span.id = "status" + pJobId;
+  static createJobStatusSpan (pJobId) {
+    const span = Utils.createSpan("", "", "status" + pJobId);
+    span.innerText = Character.CLOCKWISE_OPEN_CIRCLE_ARROW + Character.NO_BREAK_SPACE;
     span.style.display = "none";
     span.style.fontWeight = "bold";
+    return span;
+  }
+
+  static createTd (pClassName, pInnerText, pId) {
+    const td = document.createElement("td");
+    if (pId) {
+      td.id = pId;
+    }
+    if (pClassName) {
+      td.className = pClassName;
+    }
+    if (pInnerText) {
+      td.innerText = pInnerText;
+    }
+    return td;
+  }
+
+  static createDiv (pClassName, pInnerText, pId) {
+    const div = document.createElement("div");
+    if (pId) {
+      div.id = pId;
+    }
+    if (pClassName) {
+      div.className = pClassName;
+    }
+    if (pInnerText) {
+      div.innerText = pInnerText;
+    }
+    return div;
+  }
+
+  static createSpan (pClassName, pInnerText, pId) {
+    const span = document.createElement("span");
+    if (pId) {
+      span.id = pId;
+    }
+    if (pClassName) {
+      span.className = pClassName;
+    }
+    if (pInnerText) {
+      span.innerText = pInnerText;
+    }
     return span;
   }
 }

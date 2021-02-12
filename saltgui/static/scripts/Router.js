@@ -1,253 +1,374 @@
-import {API} from './Api.js';
-import {BeaconsMinionRoute} from './routes/BeaconsMinion.js';
-import {BeaconsRoute} from './routes/Beacons.js';
-import {CommandBox} from './CommandBox.js';
-import {GrainsMinionRoute} from './routes/GrainsMinion.js';
-import {GrainsRoute} from './routes/Grains.js';
-import {JobRoute} from './routes/Job.js';
-import {JobsRoute} from './routes/Jobs.js';
-import {KeysRoute} from './routes/Keys.js';
-import {LoginRoute} from './routes/Login.js';
-import {MinionsRoute} from './routes/Minions.js';
-import {OptionsRoute} from './routes/Options.js';
-import {PillarsMinionRoute} from './routes/PillarsMinion.js';
-import {PillarsRoute} from './routes/Pillars.js';
-import {SchedulesMinionRoute} from './routes/SchedulesMinion.js';
-import {SchedulesRoute} from './routes/Schedules.js';
-import {TemplatesRoute} from './routes/Templates.js';
+/* global document window */
+
+import {API} from "./Api.js";
+import {BeaconsMinionPage} from "./pages/BeaconsMinion.js";
+import {BeaconsPage} from "./pages/Beacons.js";
+import {Character} from "./Character.js";
+import {CommandBox} from "./CommandBox.js";
+import {EventsPage} from "./pages/Events.js";
+import {GrainsMinionPage} from "./pages/GrainsMinion.js";
+import {GrainsPage} from "./pages/Grains.js";
+import {JobPage} from "./pages/Job.js";
+import {JobsPage} from "./pages/Jobs.js";
+import {KeysPage} from "./pages/Keys.js";
+import {LoginPage} from "./pages/Login.js";
+import {LogoutPage} from "./pages/Logout.js";
+import {MinionsPage} from "./pages/Minions.js";
+import {OptionsPage} from "./pages/Options.js";
+import {PillarsMinionPage} from "./pages/PillarsMinion.js";
+import {PillarsPage} from "./pages/Pillars.js";
+import {ReactorsPage} from "./pages/Reactors.js";
+import {SchedulesMinionPage} from "./pages/SchedulesMinion.js";
+import {SchedulesPage} from "./pages/Schedules.js";
+import {TemplatesPage} from "./pages/Templates.js";
+import {Utils} from "./Utils.js";
 
 export class Router {
 
-  constructor() {
-    this._logoutTimer = this._logoutTimer.bind(this);
+  constructor () {
+    Character.init();
 
     this.api = new API();
-    this.commandbox = new CommandBox(this.api);
-    this.currentRoute = undefined;
-    this.routes = [];
+    this.api.router = this;
+    this.commandbox = new CommandBox(this, this.api);
+    this.currentPage = undefined;
+    this.pages = [];
 
-    this._registerRoute(new LoginRoute(this));
-    this._registerRoute(new MinionsRoute(this));
-    this._registerRoute(this.keysRoute = new KeysRoute(this));
-    this._registerRoute(new GrainsRoute(this));
-    this._registerRoute(new GrainsMinionRoute(this));
-    this._registerRoute(new SchedulesRoute(this));
-    this._registerRoute(new SchedulesMinionRoute(this));
-    this._registerRoute(new PillarsRoute(this));
-    this._registerRoute(new PillarsMinionRoute(this));
-    this._registerRoute(new BeaconsRoute(this));
-    this._registerRoute(this.beaconsMinionRoute = new BeaconsMinionRoute(this));
-    this._registerRoute(this.jobRoute = new JobRoute(this));
-    this._registerRoute(new JobsRoute(this));
-    this._registerRoute(new TemplatesRoute(this));
-    this._registerRoute(new OptionsRoute(this));
-
-    // show template menu item if templates defined
-    const templatesText = window.sessionStorage.getItem("templates");
-    if(templatesText && templatesText !== "undefined") {
-      const item1 = document.querySelector("#button-templates1");
-      item1.style.display = "inline-block";
-      const item2 = document.querySelector("#button-templates2");
-      item2.style.display = "inline-block";
-    }
+    this._registerPage(new LoginPage(this));
+    this._registerPage(this.minionsPage = new MinionsPage(this));
+    this._registerPage(this.keysPage = new KeysPage(this));
+    this._registerPage(this.grainsPage = new GrainsPage(this));
+    this._registerPage(this.grainsMinionPage = new GrainsMinionPage(this));
+    this._registerPage(this.schedulesPage = new SchedulesPage(this));
+    this._registerPage(this.schedulesMinionPage = new SchedulesMinionPage(this));
+    this._registerPage(this.pillarsPage = new PillarsPage(this));
+    this._registerPage(this.pillarsMinionPage = new PillarsMinionPage(this));
+    this._registerPage(this.beaconsPage = new BeaconsPage(this));
+    this._registerPage(this.beaconsMinionPage = new BeaconsMinionPage(this));
+    this._registerPage(this.jobPage = new JobPage(this));
+    this._registerPage(this.jobsPage = new JobsPage(this));
+    this._registerPage(this.templatesPage = new TemplatesPage(this));
+    this._registerPage(this.eventsPage = new EventsPage(this));
+    this._registerPage(this.reactorsPage = new ReactorsPage(this));
+    this._registerPage(this.optionsPage = new OptionsPage(this));
+    this._registerPage(new LogoutPage(this));
 
     this._registerRouterEventListeners();
 
-    this.goTo(window.location.pathname + window.location.search);
+    Router.updateMainMenu();
+
+    const hash = window.location.hash.replace(/^#/, "");
+    const search = window.location.search;
+    /* eslint-disable compat/compat */
+    /* URLSearchParams.entries() is not supported in IE 11 */
+    /* URLSearchParams is not supported in op_mini all, IE 11, Baidu 7.12 */
+    this.goTo(hash, Object.fromEntries(new URLSearchParams(search)));
+    /* eslint-enable compat/compat */
   }
 
-  _registerRouterEventListeners() {
-    document.querySelector(".logo")
-      .addEventListener("click", pClickEvent => {
-        if(window.location.pathname === "/login") return;
-        if(window.event.ctrlKey) {
-          window.location.assign("/options");
+  _registerMenuItem (pParentId, pButtonId, pUrl) {
+
+    // full menu
+
+    const fullMenuDiv = document.querySelector(".fullmenu");
+
+    const dropDownName = pParentId || pButtonId;
+    let dropDownDiv = document.getElementById("dropdown-" + dropDownName);
+    if (!dropDownDiv) {
+      dropDownDiv = Utils.createDiv("dropdown", "", "dropdown-" + dropDownName);
+      fullMenuDiv.append(dropDownDiv);
+    }
+
+    if (pParentId) {
+      let dropdownContent = document.getElementById("dropdown-content-" + pParentId);
+      if (!dropdownContent) {
+        dropdownContent = Utils.createDiv("dropdown-content", "", "dropdown-content-" + pParentId);
+        dropDownDiv.append(dropdownContent);
+      }
+      const itemDiv = Utils.createDiv("run-command-button menu-item", pButtonId, "button-" + pButtonId + "1");
+      dropdownContent.append(itemDiv);
+    } else {
+      const topItemDiv = Utils.createDiv("menu-item", pButtonId, "button-" + pButtonId + "1");
+      dropDownDiv.append(topItemDiv);
+    }
+
+    // mini menu
+
+    const miniMenuDiv = document.querySelector(".minimenu");
+    const dropdownContent2 = miniMenuDiv.querySelector(".dropdown-content");
+    // 00A0 = NO-BREAK SPACE
+    const menuItemDiv = Utils.createDiv("run-command-button menu-item", (pParentId ? "-\u00A0" : "") + pButtonId, "button-" + pButtonId + "2");
+    dropdownContent2.append(menuItemDiv);
+
+    // activate the menu items as needed
+
+    // conditions go inside the handler because the pages
+    // data may still being retrieved at this point
+    for (const nr of ["1", "2"]) {
+      document.getElementById("button-" + pButtonId + nr).
+        addEventListener("click", () => {
+          const pages = Router._getPagesList();
+          if (pUrl && (pButtonId === "logout" || pages.length === 0 || pages.includes(pButtonId))) {
+            this.goTo(pUrl);
+          }
+        });
+    }
+  }
+
+  _registerRouterEventListeners () {
+    document.getElementById("logo").
+      addEventListener("click", () => {
+        if (window.event.ctrlKey) {
+          this.goTo("options");
         } else {
-          window.location.assign("/");
+          this.goTo("");
         }
       });
 
-    document.querySelector("#button-minions1")
-      .addEventListener("click", pClickEvent =>
-        window.location.replace("/")
-      );
-    document.querySelector("#button-minions2")
-      .addEventListener("click", pClickEvent =>
-        window.location.replace("/")
-      );
-
-    document.querySelector("#button-grains1")
-      .addEventListener('click', pClickEvent =>
-        window.location.replace("/grains")
-      );
-    document.querySelector("#button-grains2")
-      .addEventListener('click', pClickEvent =>
-        window.location.replace("/grains")
-      );
-
-    document.querySelector("#button-schedules1")
-      .addEventListener('click', pClickEvent =>
-        window.location.replace("/schedules")
-      );
-    document.querySelector("#button-schedules2")
-      .addEventListener('click', pClickEvent =>
-        window.location.replace("/schedules")
-      );
-
-    document.querySelector("#button-pillars1")
-      .addEventListener('click', pClickEvent =>
-        window.location.replace("/pillars")
-      );
-    document.querySelector("#button-pillars2")
-      .addEventListener('click', pClickEvent =>
-        window.location.replace("/pillars")
-      );
-
-    document.querySelector("#button-beacons1")
-      .addEventListener('click', pClickEvent =>
-        window.location.replace("/beacons")
-      );
-    document.querySelector("#button-beacons2")
-      .addEventListener('click', pClickEvent =>
-        window.location.replace("/beacons")
-      );
-
-    document.querySelector("#button-keys1")
-      .addEventListener("click", pClickEvent =>
-        window.location.replace("/keys")
-      );
-    document.querySelector("#button-keys2")
-      .addEventListener("click", pClickEvent =>
-        window.location.replace("/keys")
-      );
-
-    document.querySelector("#button-jobs1")
-      .addEventListener('click', pClickEvent =>
-        window.location.replace("/jobs")
-      );
-    document.querySelector("#button-jobs2")
-      .addEventListener('click', pClickEvent =>
-        window.location.replace("/jobs")
-      );
-
-    document.querySelector("#button-templates1")
-      .addEventListener('click', pClickEvent =>
-        window.location.replace("/templates")
-      );
-    document.querySelector("#button-templates2")
-      .addEventListener('click', pClickEvent =>
-        window.location.replace("/templates")
-      );
-
-    document.querySelector("#button-logout1")
-      .addEventListener("click", pClickEvent => {
-        this.api.logout().then(
-          pLogoutData => window.location.replace("/login?reason=logout"));
-      });
-    document.querySelector("#button-logout2")
-      .addEventListener("click", pClickEvent => {
-        this.api.logout().then(
-          pLogoutData => window.location.replace("/login?reason=logout"));
-      });
-
-    // don't verify the session too often
-    setInterval(this._logoutTimer, 60000);
-  }
-
-  _logoutTimer() {
-    // are we logged in?
-    const token = window.sessionStorage.getItem("token");
-    if(!token) return;
-
-    // just a random lightweight api call
-    const wheelConfigValuesPromise = this.api.getWheelConfigValues();
-    // don't act in the callbacks
-    // Api.apiRequest will do all the work
-    wheelConfigValuesPromise.then(pWheelConfigValuesData => {
-      // VOID
-    }, pWheelConfigValuesMsg => {
-      // VOID
+    addEventListener("popstate", (popstate) => {
+      const hash = popstate.target.location.hash.replace(/^#/, "");
+      const search = popstate.target.location.search;
+      /* eslint-disable compat/compat */
+      /* URLSearchParams.entries() is not supported in IE 11 */
+      /* URLSearchParams is not supported in op_mini all, IE 11, Baidu 7.12 */
+      this.goTo(hash, Object.fromEntries(new URLSearchParams(search)), 2);
+      /* eslint-enable compat/compat */
     });
+
+    this._registerMenuItem(null, "minions", "minions");
+    this._registerMenuItem("minions", "grains", "grains");
+    this._registerMenuItem("minions", "schedules", "schedules");
+    this._registerMenuItem("minions", "pillars", "pillars");
+    this._registerMenuItem("minions", "beacons", "beacons");
+    this._registerMenuItem(null, "keys", "keys");
+    this._registerMenuItem(null, "jobs", "jobs");
+    this._registerMenuItem("jobs", "templates", "templates");
+    this._registerMenuItem(null, "events", "eventsview");
+    this._registerMenuItem("events", "reactors", "reactors");
+    this._registerMenuItem(null, "logout", "logout");
   }
 
-  _registerRoute(pRoute) {
-    this.routes.push(pRoute);
-    if(pRoute.onRegister) pRoute.onRegister();
+  _registerPage (pPage) {
+    this.pages.push(pPage);
+    if (pPage.onRegister) {
+      pPage.onRegister();
+    }
   }
 
-  goTo(pPath) {
-    if(this.switchingRoute) return;
-    if(window.location.pathname === pPath && this.currentRoute) return;
-    for(const route of this.routes) {
-      if(!route.getPath().test(pPath.split("?")[0])) continue;
-      // push history state for login (including redirect to /)
-      if(pPath === "/login" || pPath === "/") window.history.pushState({}, undefined, pPath);
-      this._showRoute(route);
+  static _getUserName () {
+    const loginResponseStr = Utils.getStorageItem("session", "login-response", "{}");
+    try {
+      const loginResponse = JSON.parse(loginResponseStr);
+      return loginResponse.user;
+    } catch (err) {
+      console.error("error in object login-response=" + loginResponseStr + " --> " + err.name + ": " + err.message);
+      return null;
+    }
+  }
+
+  static _getPagesList () {
+    const pagesText = Utils.getStorageItem("session", "pages", "{}");
+    let pages;
+    try {
+      pages = JSON.parse(pagesText);
+    } catch (err) {
+      console.error("error in object saltgui_pages=" + pagesText + " --> " + err.name + ": " + err.message);
+      return {};
+    }
+    const userName = Router._getUserName();
+    if (!userName || typeof pages !== "object" || !(userName in pages)) {
+      return [];
+    }
+    const ret = pages[userName];
+    if (!ret || ret[0] === "*") {
+      return [];
+    }
+    return ret;
+  }
+
+  static _showMenuItem (pPages, pName, pChildren = []) {
+    // assume the best
+    let visible = true;
+
+    // do not show unwanted menu items
+    if (pPages.length && !pPages.includes(pName)) {
+      visible = false;
+    }
+
+    // force visibility of the logout menuitem
+    if (pName === "logout") {
+      visible = true;
+    }
+
+    // still show a menu item when a child is visible
+    let hasVisibleChild = false;
+    for (const page of pChildren) {
+      if (pPages.includes(page)) {
+        hasVisibleChild = true;
+        break;
+      }
+    }
+
+    // perform the hiding/showing
+    for (let nr = 1; nr <= 2; nr++) {
+      const item = document.getElementById("button-" + pName + nr);
+      item.style.color = !visible && hasVisibleChild ? "lightgray" : "black";
+      if (visible || hasVisibleChild) {
+        item.classList.remove("menu-item-hidden");
+      } else {
+        item.classList.add("menu-item-hidden");
+      }
+    }
+  }
+
+  static updateMainMenu () {
+    const pages = Router._getPagesList();
+
+    Router._showMenuItem(pages, "minions", ["grains", "schedules", "pillars", "beacons"]);
+    Router._showMenuItem(pages, "grains");
+    Router._showMenuItem(pages, "schedules");
+    Router._showMenuItem(pages, "pillars");
+    Router._showMenuItem(pages, "beacons");
+    Router._showMenuItem(pages, "keys");
+    Router._showMenuItem(pages, "jobs", ["templates"]);
+    Router._showMenuItem(pages, "templates");
+    Router._showMenuItem(pages, "events", ["reactors"]);
+    Router._showMenuItem(pages, "reactors");
+    Router._showMenuItem(pages, "logout");
+  }
+
+  // pForward = 0 --> normal navigation
+  // pForward = 1 --> back navigation using regular gui
+  // pForward = 2 --> back navigation using browser
+  goTo (pHash, pQuery = {}, pForward = 0) {
+
+    if (Utils.getStorageItem("session", "login-response") === null) {
+      // the fact that we don't have a session will be caught later
+      // but this was shows less error messages on the console
+      pHash = "login";
+      pQuery = {"reason": "no-session"};
+    }
+
+    const pages = Router._getPagesList();
+    if (!pHash) {
+      // go to the concrete default page
+      if (pages.length) {
+        pHash = pages[0];
+      } else {
+        pHash = "minions";
+      }
+    }
+
+    // save the details from the parent
+    const parentHash = document.location.hash.replace(/^#/, "");
+    const search = window.location.search;
+    /* eslint-disable compat/compat */
+    /* URLSearchParams.entries() is not supported in IE 11 */
+    /* URLSearchParams is not supported in op_mini all, IE 11, Baidu 7.12 */
+    const parentQuery = Object.fromEntries(new URLSearchParams(search));
+    /* eslint-enable compat/compat */
+
+    for (const route of this.pages) {
+      if (route.path !== pHash) {
+        continue;
+      }
+      // push history state, so that the address bar holds the correct
+      // deep-link; and so that we can use the back-button
+      let url = "/";
+      let sep = "?";
+      for (const key in pQuery) {
+        const value = pQuery[key];
+        if (!value || value === "undefined") {
+          continue;
+        }
+        url += sep + key + "=" + encodeURIComponent(value);
+        sep = "&";
+      }
+      url += "#" + pHash;
+      if (parentHash === route.path) {
+        // page refresh
+        // prevents being detected as "forward navigation"
+        // stay on the page, but parameters may have been updated
+        window.history.replaceState({}, undefined, url);
+      } else if (pForward === 0) {
+        // forward navigation
+        window.history.pushState({}, undefined, url);
+        route.parentHash = parentHash;
+        route.parentQuery = parentQuery;
+      } else if (pForward === 1) {
+        // close-icon on a panel
+        // do not save parent details
+        // these were already registered on the way forward
+        window.history.pushState({}, undefined, url);
+      } else if (pForward === 2) {
+        // backward navigation from browser
+        // do nothing extra
+      }
+      this._showPage(route);
       return;
     }
+
     // route could not be found
     // just go to the main page
-    this.goTo("/");
+    if (pHash === "") {
+      console.log("cannot find default page");
+      return;
+    }
+    this.goTo("");
   }
 
-  _showRoute(pRoute) {
-    const myThis = this;
+  _showPage (pPage) {
+    pPage.clearPage();
 
-    pRoute.getPageElement().style.display = "";
+    pPage.pageElement.style.display = "";
 
-    const minionMenuItem = document.getElementById("button-minions1");
-    const jobsMenuItem = document.getElementById("button-jobs1");
-
+    // de-activate all menu items
     const activeMenuItems = Array.from(document.querySelectorAll(".menu-item-active"));
-    activeMenuItems.forEach(
-      function (e){ e.classList.remove("menu-item-active"); }
-    );
+    activeMenuItems.forEach((menuItem) => {
+      menuItem.classList.remove("menu-item-active");
+    });
 
-    const elem1 = pRoute.getMenuItemElement1();
-    if(elem1) {
+    // highlight the fullmenu item
+    const elem1 = document.getElementById(pPage.menuItemElement1);
+    if (elem1) {
       elem1.classList.add("menu-item-active");
+      const parentItem = elem1.parentElement.parentElement.firstChild;
       // activate also parent menu item if child element is selected
-      if(elem1.id === "button-pillars1" ||
-         elem1.id === "button-schedules1" ||
-         elem1.id === "button-grains1" ||
-         elem1.id === "button-beacons1") {
-        minionMenuItem.classList.add("menu-item-active");
-      }
-      if(elem1.id === "button-jobs1" ||
-         elem1.id === "button-templates1") {
-        jobsMenuItem.classList.add("menu-item-active");
+      if (parentItem.id.startsWith("button-")) {
+        parentItem.classList.add("menu-item-active");
       }
     }
 
-    const elem2 = pRoute.getMenuItemElement2();
-    if(elem2) {
+    // highlight the minimenu item
+    const elem2 = document.getElementById(pPage.menuItemElement2);
+    if (elem2) {
       elem2.classList.add("menu-item-active");
     }
 
-    this.switchingRoute = true;
-
-    pRoute.onShow();
+    pPage.onShow();
 
     // start the event-pipe (again)
     // it is either not started, or needs restarting
-    this.api.getEvents(this);
+    API.getEvents(this);
 
-    if(myThis.currentRoute) {
-      myThis._hideRoute(myThis.currentRoute);
+    if (this.currentPage && this.currentPage !== pPage) {
+      Router._hidePage(this.currentPage);
     }
+    this.currentPage = pPage;
 
-    myThis.currentRoute = pRoute;
-    myThis.currentRoute.getPageElement().className = "route current";
-    myThis.switchingRoute = false;
+    this.currentPage.pageElement.classList.add("current");
   }
 
-  _hideRoute(pRoute) {
-    pRoute.getPageElement().className = "route";
-    setTimeout(function() {
+  static _hidePage (pPage) {
+    const page = pPage.pageElement;
+    page.classList.remove("current");
+    // 500ms matches the timeout in main.css (.route)
+    window.setTimeout(() => {
       // Hide element after fade, so it does not expand the body
-      pRoute.getPageElement().style.display = "none";
+      page.style.display = "none";
     }, 500);
-    if(pRoute.onHide) pRoute.onHide();
+    if (pPage.onHide) {
+      pPage.onHide();
+    }
   }
-
 }

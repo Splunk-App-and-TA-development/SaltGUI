@@ -11,6 +11,7 @@
   border-radius: 3px;
   position: absolute;
   white-space: pre;
+  font-weight: normal;
 
   /* point the tooltip to its target */
   left: 50%;
@@ -18,11 +19,23 @@
   /* float the tooltip above its target */
   z-index: 10;
   bottom: calc(100% + 8px);
+
+  /* shorten the text when it is too much */
+  max-width: 500px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .tooltip > .tooltip-text-bottom-left {
   text-align: left;
-  transform: translate(-10%, 0);
+  transform: translate(-5%, 0);
+}
+
+.tooltip > .tooltip-text-error-bottom-left {
+  text-align: left;
+  transform: translate(-5%, 0);
+  background-color: red;
+  font-weight: bold;
 }
 
 .tooltip > .tooltip-text-bottom-center {
@@ -67,7 +80,12 @@ pre.output .tooltip:hover {
 }
 
 .tooltip > .tooltip-text-bottom-left::after {
-  left: calc(10% - 2.5px);
+  left: calc(5% - 2.5px);
+}
+
+.tooltip > .tooltip-text-error-bottom-left::after {
+  left: calc(5% - 2.5px);
+  border-color: red transparent transparent transparent;
 }
 
 .tooltip > .tooltip-text-bottom-center::after {

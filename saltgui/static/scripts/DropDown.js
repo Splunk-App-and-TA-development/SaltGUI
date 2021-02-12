@@ -1,100 +1,147 @@
-import {Route} from './routes/Route.js';
+import {Character} from "./Character.js";
+import {Utils} from "./Utils.js";
+
+// each menu item has a 2 properties
+// 1: the title
+//    menu items that are always useable are just plain text
+//    but it may be a callback function which:
+//    a) sets the title using pMenuItem.innerText = "xyz"
+//    b) arranges the visibility using pMenuItem.style.display = true/false
+// 2: the callback function
+//    called when the menu item is selected: (pClickEvent) => { ... }
+// all menu items are re-validated when the menu pops up
+// when all menu items are invisible, the menu-button must be made invisible
+// since this can happen at any time, this cannot be done when the menu is shown
+// worse, since the menu button may be invisible, thave event may never happen
+// call (DropDownMenuInstance).verifyApp() to show/hide the menu button based
+// on the visibility of its menu items. when all menu items are hidden, so is
+// the menu. when at least one item is visible, the menu is visible
+// remember to call verifyApp() when that is potentially the case
 
 export class DropDownMenu {
 
   // Creates an empty dropdown menu
   // The visual clue for the menu is added to the given element
-  constructor(pParentElement) {
-
-    this._callback = this._callback.bind(this);
-    this.verifyAll = this.verifyAll.bind(this);
+  constructor (pParentElement) {
 
     // allow reduced code on the caller side
-    if(pParentElement.tagName === "TR") {
-      const td = Route.createTd("", "");
+    if (pParentElement.tagName === "TR") {
+      const td = Utils.createTd();
       pParentElement.appendChild(td);
       pParentElement = td;
     }
 
-    this.menuDropdown = Route.createDiv("run-command-button", "");
+    this.menuDropdown = Utils.createDiv("run-command-button");
+    this.menuDropdown.classList.add("no-search");
 
-    if(pParentElement.id === "cmd-box") {
-      // 1F4D6 (D83D+DCD6) = A BOOK
-      this.menuButton = Route.createDiv("menu-dropdown", "\uD83D\uDCD6");
-    } else if(pParentElement.classList && pParentElement.classList.contains("minion-output")) {
-      // 1F4D6 (D83D+DCD6) = A BOOK
-      this.menuButton = Route.createSpan("menu-dropdown", "\u2261");
+    if (pParentElement.id === "cmd-box") {
+      this.menuButton = Utils.createDiv("menu-dropdown", Character.A_BOOK);
+    } else if (pParentElement.classList && pParentElement.classList.contains("minion-output")) {
+      this.menuButton = Utils.createSpan("menu-dropdown", Character.CH_HAMBURGER);
     } else {
-      // 2261 = MATHEMATICAL OPERATOR IDENTICAL TO (aka "hamburger")
       // assume it will be a command menu
-      this.menuButton = Route.createDiv("menu-dropdown", "\u2261");
+      this.menuButton = Utils.createDiv("menu-dropdown", Character.CH_HAMBURGER);
     }
+    this.menuButton.addEventListener("click", (pClickEvent) => {
+      // better support for touch screens where user touch
+      // the menu button instead of hovering over it
+      pClickEvent.stopPropagation();
+    });
 
     // hide the menu until it receives menu-items
     this.verifyAll();
 
     this.menuDropdown.appendChild(this.menuButton);
-    this.menuDropdownContent = Route.createDiv("menu-dropdown-content", "");
+    this.menuDropdownContent = Utils.createDiv("menu-dropdown-content");
     this.menuDropdown.appendChild(this.menuDropdownContent);
-    this.menuDropdown.addEventListener("mouseenter", this.verifyAll);
+    this.menuDropdown.addEventListener("mouseenter", () => {
+      this.verifyAll();
+    });
     pParentElement.appendChild(this.menuDropdown);
   }
 
-  verifyAll() {
+  verifyAll () {
     let visibleCount = 0;
-    if(this.menuDropdownContent) {
-      for(const chld of this.menuDropdownContent.children) {
+    if (this.menuDropdownContent) {
+      for (const chld of this.menuDropdownContent.children) {
         const verifyCallBack = chld.verifyCallBack;
-        if(verifyCallBack) verifyCallBack(chld);
-        if(chld.style.display !== "none") visibleCount++;
+        if (verifyCallBack) {
+          const title = verifyCallBack(chld);
+          if (title === null) {
+            chld.style.display = "none";
+            continue;
+          }
+          chld.innerText = DropDownMenu._sanitizeMenuItemTitle(title);
+          chld.style.removeProperty("display");
+        }
+        visibleCount += 1;
       }
     }
     // hide the menu when it has no visible menu-items
-    const displayVisible = (this.menuDropdown.tagName === "TD") ? "table-cell" : "inline-block";
+    const displayVisible = this.menuDropdown.tagName === "TD" ? "table-cell" : "inline-block";
     const displayInvisible = "none";
-    this.menuDropdown.style.display = (visibleCount > 0) ? displayVisible : displayInvisible;
+    this.menuDropdown.style.display = visibleCount > 0 ? displayVisible : displayInvisible;
+  }
+
+  static _sanitizeMenuItemTitle (pTitle) {
+    return pTitle.
+      replace(" ", Character.NO_BREAK_SPACE).
+      replace("-", Character.NON_BREAKING_HYPHEN).
+      replace("...", Character.HORIZONTAL_ELLIPSIS);
   }
 
   // Add a menu item at the end of this dropdown menu
   // Runs the given callback function when selected
   // When the title is actually a function then this
   // function is called each time the menu opens
-  // This allows dynamic menuitem titles (use menuitem.innerText/innerHTML)
+  // This allows dynamic menuitem titles (use menuitem.innerText)
   // or visibility (use menuitem.style.display = "none"/"inline-block")
-  addMenuItem(pTitle, pCallBack, pValue) {
-    const button = Route.createDiv("run-command-button", "...");
-    if(typeof pTitle === "string")
-      button.innerHTML = pTitle;
-    else
+  addMenuItem (pTitle, pCallBack, pValue) {
+    const button = Utils.createDiv("run-command-button", "...");
+    if (pValue) {
+      button._value = pValue;
+    }
+    if (typeof pTitle === "string") {
+      button.innerText = DropDownMenu._sanitizeMenuItemTitle(pTitle);
+    } else {
       button.verifyCallBack = pTitle;
-    button.addEventListener("click", pClickEvent =>
-      this._callback(pClickEvent, pCallBack, pValue)
-    );
+    }
+    button.addEventListener("click", (pClickEvent) => {
+      pClickEvent.target.parentElement.style.display = "none";
+      setTimeout(() => {
+        pClickEvent.target.parentElement.style.display = "";
+      }, 500);
+      this._callback(pClickEvent, pCallBack, pValue);
+    });
     this.menuDropdownContent.appendChild(button);
     this.verifyAll();
     return button;
   }
 
-  _callback(pClickEvent, pCallBack, pValue) {
+  _callback (pClickEvent, pCallBack, pValue) {
     this._value = pValue;
     pCallBack(pClickEvent);
     pClickEvent.stopPropagation();
   }
 
-  setTitle(pTitle) {
+  setTitle (pTitle) {
     // Setting the title implies that we are interested
     // in the menu values, rather than their actions.
     // Use a slightly different clue for that.
-    // 25BC = BLACK DOWN-POINTING TRIANGLE
-    this.menuButton.innerHTML = pTitle + "&nbsp;\u25BC";
+    this.menuButton.innerText = DropDownMenu._sanitizeMenuItemTitle(pTitle + " " + Character.BLACK_DOWN_POINTING_TRIANGLE);
   }
 
-  __showMenu() {
+  __showMenu () {
     this.menuDropdown.style.display = "inline-block";
   }
 
-  __hideMenu() {
+  __hideMenu () {
     this.menuDropdown.style.display = "none";
   }
 
+  clearMenu () {
+    while (this.menuDropdownContent.firstChild) {
+      this.menuDropdownContent.removeChild(this.menuDropdownContent.firstChild);
+    }
+  }
 }

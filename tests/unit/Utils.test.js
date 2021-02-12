@@ -1,10 +1,12 @@
-const assert = require('chai').assert;
+/* global describe it require */
 
-import {Utils} from '../../saltgui/static/scripts/Utils.js';
+const assert = require("chai").assert;
 
-describe('Unittests for Utils.js', function() {
-  
-  it('test getQueryParam2', done => {
+import {Utils} from "../../saltgui/static/scripts/Utils.js";
+
+describe("Unittests for Utils.js", () => {
+
+  it("test getQueryParam2", (done) => {
     let result;
 
     // no parameters

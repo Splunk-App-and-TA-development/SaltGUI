@@ -1,5 +1,10 @@
+/* global config EventSource window */
+
+import {CommandBox} from "./CommandBox.js";
+import {Utils} from "./Utils.js";
+
 export class HTTPError extends Error {
-  constructor(pStatus, pMessage) {
+  constructor (pStatus, pMessage) {
     super();
     this.status = pStatus;
     this.message = pMessage;
@@ -7,26 +12,20 @@ export class HTTPError extends Error {
 }
 
 export class API {
-  constructor() {
-    this.apiRequest = this.apiRequest.bind(this);
-    this.login = this.login.bind(this);
-    this.logout = this.logout.bind(this);
-  }
-
-  login(pUserName, pPassWord, pEauth="pam") {
+  login (pUserName, pPassWord, pEauth = "pam") {
     const params = {
-      username: pUserName,
-      password: pPassWord,
-      eauth: pEauth
+      "eauth": pEauth,
+      "password": pPassWord,
+      "username": pUserName
     };
 
     // store it as the default login method
-    window.localStorage.setItem("eauth", pEauth);
+    Utils.setStorageItem("local", "eauth", pEauth);
 
-    return this.apiRequest("POST", "/login", params)
-      .then(pLoginData => {
+    return this.apiRequest("POST", "/login", params).
+      then((pLoginData) => {
         const response = pLoginData.return[0];
-        if(Object.keys(response.perms).length === 0) {
+        if (Object.keys(response.perms).length === 0) {
           // We are allowed to login but there are no permissions available
           // This may happen e.g. for accounts that are in PAM,
           // but not in the 'master' file.
@@ -34,155 +33,174 @@ export class API {
           // just like 403 Unauthorized
           throw new HTTPError(-1, "No permissions");
         }
-        window.sessionStorage.setItem("login-response", JSON.stringify(response));
-        window.sessionStorage.setItem("token", response.token);
+        Utils.setStorageItem("session", "login-response", JSON.stringify(response));
+        Utils.setStorageItem("session", "token", response.token);
+        return true;
       });
   }
 
-  _cleanStorage() {
+  static _cleanStorage () {
     // clear local storage except key 'eauth'
-    const eauth = window.localStorage.getItem("eauth");
-    window.localStorage.clear();
-    window.localStorage.setItem("eauth", eauth);
+    const eauth = Utils.getStorageItem("local", "eauth");
+    Utils.clearStorage("local");
+    Utils.setStorageItem("local", "eauth", eauth);
 
     // clear all of session storage
-    window.sessionStorage.clear();
+    Utils.clearStorage("session");
   }
 
-  logout() {
+  logout () {
     // only delete the session here as the router should take care of
     // redirecting to the login screen
-    const myThis = this;
-    return this.apiRequest("POST", "/logout", {})
-      .then(pResponse => {
+    return this.apiRequest("POST", "/logout", {}).
+      then(() => {
         // we could logout, assume the session is terminated
-        myThis._cleanStorage();
-      }, pResponse => {
+        API._cleanStorage();
+        return true;
+      }, () => {
         // we could not logout, assume the session is broken
-        myThis._cleanStorage();
+        API._cleanStorage();
+        return false;
       });
   }
 
-  getStaticMinionsTxt() {
+  getStaticMinionsTxt () {
     return this.apiRequest("GET", "/static/minions.txt");
   }
 
-  getLocalBeaconsList(pMinionId) {
+  getLocalBeaconsList (pMinionId) {
     const params = {
-      client: "local",
-      fun: "beacons.list",
-      kwarg: { return_yaml: false }
+      "client": "local",
+      "fun": "beacons.list",
+      "kwarg": {"return_yaml": false}
     };
-    if(pMinionId) {
-      params.tgt_type = "list";
+    if (pMinionId) {
+      params["tgt_type"] = "list";
       params.tgt = pMinionId;
     } else {
-      params.tgt_type = "glob";
+      params["tgt_type"] = "glob";
       params.tgt = "*";
     }
     return this.apiRequest("POST", "/", params);
   }
 
-  getLocalGrainsItems(pMinionId) {
+  getLocalGrainsItems (pMinionId) {
     const params = {
-      client: "local",
-      fun: "grains.items",
+      "client": "local",
+      "fun": "grains.items"
     };
-    if(pMinionId) {
-      params.tgt_type = "list";
+    if (pMinionId) {
+      params["tgt_type"] = "list";
       params.tgt = pMinionId;
     } else {
-      params.tgt_type = "glob";
+      params["tgt_type"] = "glob";
       params.tgt = "*";
     }
     return this.apiRequest("POST", "/", params);
   }
 
-  getLocalPillarItems(pMinionId) {
+  getLocalPillarItems (pMinionId) {
     const params = {
-      client: "local",
-      fun: "pillar.items"
+      "client": "local",
+      "fun": "pillar.items"
     };
-    if(pMinionId) {
-      params.tgt_type = "list";
+    if (pMinionId) {
+      params["tgt_type"] = "list";
       params.tgt = pMinionId;
     } else {
-      params.tgt_type = "glob";
+      params["tgt_type"] = "glob";
       params.tgt = "*";
     }
     return this.apiRequest("POST", "/", params);
   }
 
-  getLocalPillarObfuscate(pMinionId) {
+  getLocalPillarObfuscate (pMinionId) {
     const params = {
-      client: "local",
-      fun: "pillar.obfuscate"
+      "client": "local",
+      "fun": "pillar.obfuscate"
     };
-    if(pMinionId) {
-      params.tgt_type = "list";
+    if (pMinionId) {
+      params["tgt_type"] = "list";
       params.tgt = pMinionId;
     } else {
-      params.tgt_type = "glob";
+      params["tgt_type"] = "glob";
       params.tgt = "*";
     }
     return this.apiRequest("POST", "/", params);
   }
 
-  getLocalScheduleList(pMinionId) {
+  getLocalScheduleList (pMinionId) {
     const params = {
-      client: "local",
-      fun: "schedule.list",
-      kwarg: { return_yaml: false }
+      "client": "local",
+      "fun": "schedule.list",
+      "kwarg": {"return_yaml": false}
     };
-    if(pMinionId) {
-      params.tgt_type = "list";
+    if (pMinionId) {
+      params["tgt_type"] = "list";
       params.tgt = pMinionId;
     } else {
-      params.tgt_type = "glob";
+      params["tgt_type"] = "glob";
       params.tgt = "*";
     }
     return this.apiRequest("POST", "/", params);
   }
 
-  getRunnerJobsActive() {
+  getLocalTestProviders () {
     const params = {
-      client: "runner",
-      fun: "jobs.active"
+      "client": "local",
+      "fun": "test.providers",
+      "tgt": "*"
     };
     return this.apiRequest("POST", "/", params);
   }
 
-  getRunnerJobsListJob(pJobId) {
+  getRunnerJobsActive () {
     const params = {
-      client: "runner",
-      fun: "jobs.list_job",
-      jid: pJobId
+      "client": "runner",
+      "fun": "jobs.active"
     };
     return this.apiRequest("POST", "/", params);
   }
 
-  getRunnerJobsListJobs() {
+  getRunnerJobsListJob (pJobId) {
     const params = {
-      client: "runner",
-      fun: "jobs.list_jobs"
+      "client": "runner",
+      "fun": "jobs.list_job",
+      "jid": pJobId
     };
     return this.apiRequest("POST", "/", params);
   }
 
-  getWheelConfigValues() {
+  getRunnerJobsListJobs () {
     const params = {
-      client: "wheel",
-      fun: "config.values"
+      "client": "runner",
+      "fun": "jobs.list_jobs"
     };
     return this.apiRequest("POST", "/", params);
   }
 
-  getWheelKeyFinger(pMinionId) {
+  getRunnerManageVersions () {
     const params = {
-      client: "wheel",
-      fun: "key.finger"
+      "client": "runner",
+      "fun": "manage.versions"
     };
-    if(pMinionId) {
+    return this.apiRequest("POST", "/", params);
+  }
+
+  getWheelConfigValues () {
+    const params = {
+      "client": "wheel",
+      "fun": "config.values"
+    };
+    return this.apiRequest("POST", "/", params);
+  }
+
+  getWheelKeyFinger (pMinionId) {
+    const params = {
+      "client": "wheel",
+      "fun": "key.finger"
+    };
+    if (pMinionId) {
       params.match = pMinionId;
     } else {
       params.match = "*";
@@ -190,65 +208,96 @@ export class API {
     return this.apiRequest("POST", "/", params);
   }
 
-  getWheelKeyListAll() {
+  getWheelKeyListAll () {
     const params = {
-      client: "wheel",
-      fun: "key.list_all",
+      "client": "wheel",
+      "fun": "key.list_all"
     };
     return this.apiRequest("POST", "/", params);
   }
 
-  apiRequest(pMethod, pRoute, pParams) {
-    const location = config.API_URL + pRoute;
-    const token = window.sessionStorage.getItem("token");
+  getWheelMinionsConnected () {
+    const params = {
+      "client": "wheel",
+      "fun": "minions.connected"
+    };
+    return this.apiRequest("POST", "/", params);
+  }
+
+  getStats () {
+    const params = {
+    };
+    return this.apiRequest("GET", "/stats", params);
+  }
+
+  apiRequest (pMethod, pPage, pParams) {
+    const url = config.API_URL + pPage;
+    const token = Utils.getStorageItem("session", "token", "");
     const headers = {
       "Accept": "application/json",
-      "X-Auth-Token": token !== null ? token : "",
-      "Cache-Control": "no-cache"
+      "Cache-Control": "no-cache",
+      "X-Auth-Token": token
     };
-    if(pRoute.endsWith(".txt")) headers["Accept"] = "text/plain";
+    if (pPage.endsWith(".txt")) {
+      headers["Accept"] = "text/plain";
+    }
     const options = {
-      method: pMethod,
-      url: location,
-      headers: headers
+      "headers": headers,
+      "method": pMethod,
+      "url": url
     };
 
-    if(pMethod === "POST") options.body = JSON.stringify(pParams);
+    if (pMethod === "POST") {
+      options.body = JSON.stringify(pParams);
+    }
 
-    const myThis = this;
-    return fetch(location, options)
-      .then(pResponse => {
-        if(pResponse.ok && pRoute.endsWith(".txt")) return pResponse.text();
-        if(pResponse.ok) return pResponse.json();
+    /* eslint-disable compat/compat */
+    /* fetch is not supported in op_mini all, IE 11 */
+    return window.fetch(url, options).
+    /* eslint-enable compat/compat */
+      then((pResponse) => {
+        if (pResponse.ok && pPage.endsWith(".txt")) {
+          return pResponse.text();
+        }
+        if (pResponse.ok) {
+          return pResponse.json();
+        }
         // fetch does not reject on > 300 http status codes,
         // so let's do it ourselves
-        if(pResponse.status === 401 && pRoute !== "/login") {
-          const loginResponseStr = window.sessionStorage.getItem("login-response");
-          if(!loginResponseStr) {
-            myThis.logout().then(() =>
-              window.location.replace("/login?reason=no-session")
-            , () =>
-              window.location.replace("/login?reason=no-session")
-            );
-            return null;
+        if (pResponse.status === 401 && pPage === "/logout") {
+          // so we can't logout?
+          API._cleanStorage();
+          return null;
+        }
+        if (pResponse.status === 401 && pPage !== "/login") {
+          const loginResponseStr = Utils.getStorageItem("session", "login-response");
+          if (!loginResponseStr) {
+            this.logout().then(() => {
+              this.router.goTo("login", {"reason": "no-session"});
+              return true;
+            }, () => {
+              this.router.goTo("login", {"reason": "no-session"});
+              return false;
+            });
           }
 
           const loginResponse = JSON.parse(loginResponseStr);
           // just in case...
-          if(loginResponse) {
+          if (loginResponse) {
             const now = Date.now() / 1000;
             const expireValue = loginResponse.expire;
-            if(now > expireValue) {
-              myThis.logout().then(() =>
-                window.location.replace("/login?reason=expired-session")
-              , () =>
-                window.location.replace("/login?reason=expired-session")
-              );
-              return null;
+            if (now > expireValue) {
+              this.logout().then(() => {
+                this.router.goTo("login", {"reason": "expired-session"});
+                return true;
+              }, () => {
+                this.router.goTo("login", {"reason": "expired-session"});
+                return false;
+              });
             }
           }
         }
-        if(pResponse.status === 404 && pRoute.endsWith(".txt")) {
+        if (pResponse.status === 404 && pPage.endsWith(".txt")) {
           // ok
           return "";
         }
@@ -256,29 +305,45 @@ export class API {
       });
   }
 
-  getEvents(pRouter) {
-    const token = window.sessionStorage.getItem("token");
-    if(!token) return;
+  static getEvents (pRouter) {
+    const tokenOnSetup = Utils.getStorageItem("session", "token");
+    if (!tokenOnSetup) {
+      return;
+    }
 
-    const source = new EventSource('/events?token=' + token);
-    source.onopen = function() {
-      //console.info('Listening for events...');
+    // allow only one event-stream
+    if (API.eventsOK) {
+      return;
+    }
+    API.eventsOK = true;
+
+    let source;
+    try {
+      /* eslint-disable compat/compat */
+      source = new EventSource(config.API_URL + "/events?token=" + tokenOnSetup);
+      /* eslint-enable compat/compat */
+    } catch (err) {
+      console.error("Cannot read the Salt-EventBus with this browser version, browser upgrade recommended");
+      return;
+    }
+    source.onopen = () => {
+      // console.info("Listening for events...");
     };
-    source.onerror = function(err) {
+    source.onerror = () => {
       // Don't show the error
       // It appears with every page-load
       source.close();
     };
-    source.onmessage = function(pMessage) {
-      const token = window.sessionStorage.getItem("token");
-      if(!token) {
+    source.onmessage = (pMessage) => {
+      const tokenOnMessage = Utils.getStorageItem("session", "token");
+      if (!tokenOnMessage) {
         // no token, stop the stream
         source.close();
         return;
       }
 
-      const loginResponseStr = window.sessionStorage.getItem("login-response");
-      if(!loginResponseStr) {
+      const loginResponseStr = Utils.getStorageItem("session", "login-response");
+      if (!loginResponseStr) {
         // no login details, stop the stream
         source.close();
         return;
@@ -286,7 +351,7 @@ export class API {
       const loginResponse = JSON.parse(loginResponseStr);
       const expireValue = loginResponse.expire;
       const now = Date.now() / 1000;
-      if(now > expireValue) {
+      if (now > expireValue) {
         // the regular session has expired, also stop the stream
         source.close();
         return;
@@ -298,27 +363,41 @@ export class API {
 
       // erase the public key value when it is present
       // it is long and boring (so not because it is a secret)
-      if(data.pub) data.pub = "...";
+      if (data.pub) {
+        data.pub = "...";
+      }
 
       // salt/beacon/<minion>/<beacon>/
-      if(tag.startsWith("salt/beacon/"))
-      {
+      if (tag.startsWith("salt/beacon/")) {
         // new beacon-value is received
-        pRouter.beaconsMinionRoute.handleSaltBeaconEvent(tag, data);
-      }
-      else if(tag === "salt/auth")
-      {
+        pRouter.beaconsMinionPage.handleSaltBeaconEvent(tag, data);
+      } else if (tag === "salt/auth") {
         // new key has been received
-        pRouter.keysRoute.handleSaltAuthEvent(tag, data);
+        pRouter.keysPage.handleSaltAuthEvent(data);
+      } else if (tag === "salt/key") {
+        pRouter.keysPage.handleSaltKeyEvent(data);
+      } else if (tag.startsWith("salt/job/") && tag.includes("/ret/")) {
+        // return value
+        CommandBox.handleSaltJobRetEvent(tag, data);
+        pRouter.jobPage.handleSaltJobRetEvent(data);
+        pRouter.minionsPage.handleSaltJobRetEvent(data);
+        pRouter.grainsPage.handleSaltJobRetEvent(data);
+        pRouter.grainsMinionPage.handleSaltJobRetEvent(data);
+        pRouter.schedulesPage.handleSaltJobRetEvent(data);
+        pRouter.schedulesMinionPage.handleSaltJobRetEvent(data);
+        pRouter.pillarsPage.handleSaltJobRetEvent(data);
+        pRouter.pillarsMinionPage.handleSaltJobRetEvent(data);
+        pRouter.beaconsPage.handleSaltJobRetEvent(data);
+        pRouter.beaconsMinionPage.handleSaltJobRetEvent(data);
+        pRouter.jobsPage.handleSaltJobRetEvent(data);
+        pRouter.templatesPage.handleSaltJobRetEvent(data);
+        pRouter.reactorsPage.handleSaltJobRetEvent(data);
+      } else if (tag.startsWith("salt/job/") && tag.includes("/prog/")) {
+        // progress value (exists only for states)
+        CommandBox.handleSaltJobProgEvent(tag, data);
       }
-      else if(tag === "salt/key")
-      {
-        pRouter.keysRoute.handleSaltKeyEvent(tag, data);
-      }
-      else if(tag.startsWith("salt/job/") && tag.includes("/ret/"))
-      {
-        pRouter.jobRoute.handleSaltJobRetEvent(tag, data);
-      }
-    }.bind(this);
+
+      pRouter.eventsPage.handleAnyEvent(tag, data);
+    };
   }
 }

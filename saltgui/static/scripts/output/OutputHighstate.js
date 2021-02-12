@@ -1,17 +1,26 @@
-import {Output} from './Output.js';
-import {OutputNested} from './OutputNested.js';
-import {Route} from '../routes/Route.js';
-import {Utils} from '../Utils.js';
+import {Output} from "./Output.js";
+import {OutputHighstateSummaryOriginal} from "./OutputHighstateSummaryOriginal.js";
+import {OutputHighstateSummarySaltGui} from "./OutputHighstateSummarySaltGui.js";
+import {OutputHighstateTaskFull} from "./OutputHighstateTaskFull.js";
+import {OutputHighstateTaskSaltGui} from "./OutputHighstateTaskSaltGui.js";
+import {OutputHighstateTaskTerse} from "./OutputHighstateTaskTerse.js";
+import {Utils} from "../Utils.js";
 
 export class OutputHighstate {
 
-  static isHighStateOutput(pCommand, pResponse) {
+  static isHighStateOutput (pCommand, pResponse) {
 
-    if(!Output.isOutputFormatAllowed("highstate")) return false;
+    if (!Output.isOutputFormatAllowed("highstate")) {
+      return false;
+    }
 
-    if(typeof pResponse !== "object") return false;
-    if(Array.isArray(pResponse)) return false;
-    switch(pCommand) {
+    if (typeof pResponse !== "object") {
+      return false;
+    }
+    if (Array.isArray(pResponse)) {
+      return false;
+    }
+    switch (pCommand) {
     case "state.apply":
     case "state.high":
     case "state.highstate":
@@ -26,163 +35,126 @@ export class OutputHighstate {
     default:
       return false;
     }
-    for(const taskKey of Object.keys(pResponse)) {
+    for (const taskKey of Object.keys(pResponse)) {
       const components = taskKey.split("_|-");
-      if(components.length !== 4) return false;
+      if (components.length !== 4) {
+        return false;
+      }
     }
     return true;
   }
 
-  static _getDurationClauseMillis(pMilliSeconds) {
-    const ms = Math.round(pMilliSeconds * 1000) / 1000;
-    return `${ms} ms`;
-  }
-
-  static _getDurationClauseSecs(pMilliSeconds) {
-    const s = Math.round(pMilliSeconds) / 1000;
-    return `${s} s`;
-  }
-
-  static getHighStateLabel(pMinionId, pMinionResponse) {
+  static getHighStateLabel (pMinionId, pMinionResponse) {
     let anyFailures = false;
     let anySkips = false;
     // do not use Object.entries, that is not supported by the test framework
-    for(const taskKey of Object.keys(pMinionResponse)) {
+    for (const taskKey of Object.keys(pMinionResponse)) {
       const task = pMinionResponse[taskKey];
-      if(task.result === null) anySkips = true;
-      else if(!task.result) anyFailures = true;
+      if (task.result === null) {
+        anySkips = true;
+      } else if (!task.result) {
+        anyFailures = true;
+      }
     }
 
-    if(anyFailures) {
+    if (anyFailures) {
       return Output.getMinionIdHtml(pMinionId, "host-failure");
     }
-    if(anySkips) {
+    if (anySkips) {
       return Output.getMinionIdHtml(pMinionId, "host-skips");
     }
     return Output.getMinionIdHtml(pMinionId, "host-success");
   }
 
-  static getHighStateOutput(pMinionId, pTasks) {
+  static getHighStateOutput (pMinionId, pTasks, pJobId) {
 
-    const div = Route.createDiv("", "");
+    const div = Utils.createDiv();
 
     let succeeded = 0;
     let failed = 0;
     let skipped = 0;
     let totalMilliSeconds = 0;
     let changes = 0;
+    let hidden = 0;
     let nr = 0;
-    for(const task of pTasks) {
+    for (const task of pTasks) {
 
       nr += 1;
-      if(task.result === null) {
+
+      if (task.duration) {
+        totalMilliSeconds += task.duration;
+      }
+
+      if (task.result === null) {
         skipped += 1;
-      } else if(task.result) {
+      } else if (task.result) {
         succeeded += 1;
       } else {
         failed += 1;
       }
 
+      if (Output.isHiddenTask(task)) {
+        hidden += 1;
+        continue;
+      }
+
       const components = task.___key___.split("_|-");
 
-      let txt = "----------";
-
-      if(task.name)
-        txt += "\n          ID: " + task.name;
-      else
-        txt += "\n          ID: (anonymous task)";
-
-      txt += "\n    Function: " + components[0] + "." + components[3];
-
-      txt += "\n      Result: " + JSON.stringify(task.result);
-
-      if(task.comment)
-        txt += "\n     Comment: " + task.comment;
-
-      if(task.start_time)
-        txt += "\n     Started: " + task.start_time;
-
-      if(task.duration) {
-        txt += "\n    Duration: " + OutputHighstate._getDurationClauseMillis(task.duration);
-        totalMilliSeconds += task.duration;
-      }
-
-      txt += "\n     Changes:";
+      const functionName = components[0] + "." + components[3];
 
       let hasChanges = false;
-      if(task.hasOwnProperty("changes")) {
-        changes = task.changes;
-        const keys = Object.keys(changes);
-        if(keys.length == 2 && keys[0] === "out" && keys[1] === "ret")
-          changes = changes["ret"];
-        const str = JSON.stringify(changes);
-        if(str !== "{}") {
-          hasChanges = true;
-          txt += "\n" + OutputNested.formatNESTED(changes, 14);
-          changes += 1;
+      let chgs = null;
+      if (task["changes"] !== undefined) {
+        chgs = task.changes;
+        const keys = Object.keys(chgs);
+        if (keys.length === 2 && keys[0] === "out" && keys[1] === "ret") {
+          chgs = chgs["ret"];
         }
+        const str = JSON.stringify(chgs);
+        if (str !== "{}") {
+          hasChanges = true;
+        }
+        changes += Object.keys(chgs).length;
       }
 
-      const taskSpan = Route.createSpan("", txt);
-      if(!task.result) {
+      const taskId = components[1];
+      let taskName = components[2];
+      if (Output.isStateOutputSelected("_id")) {
+        taskName = taskId;
+      }
+
+      let taskSpan;
+      if (Output.isStateOutputSelected("terse")) {
+        taskSpan = OutputHighstateTaskTerse.getStateOutput(task, taskName, functionName);
+      } else if (Output.isStateOutputSelected("mixed") && task.result) {
+        taskSpan = OutputHighstateTaskTerse.getStateOutput(task, taskName, functionName);
+      } else if (Output.isStateOutputSelected("changes") && task.result && hasChanges) {
+        taskSpan = OutputHighstateTaskTerse.getStateOutput(task, taskName, functionName);
+      } else if (Output.isOutputFormatAllowed("saltguihighstate")) {
+        taskSpan = OutputHighstateTaskSaltGui.getStateOutput(task, taskId, taskName, functionName, pMinionId, pJobId);
+      } else {
+        taskSpan = OutputHighstateTaskFull.getStateOutput(task, taskId, taskName, functionName);
+      }
+
+      if (!task.result) {
         taskSpan.style.color = "red";
-      } else if(hasChanges) {
+      } else if (hasChanges) {
         taskSpan.style.color = "aqua";
       } else {
         taskSpan.style.color = "lime";
       }
-      const taskDiv = Route.createDiv("", "");
-      taskDiv.id = Utils.getIdFromMinionId(pMinionId + "." + nr);
+      const taskDiv = Utils.createDiv("", "", Utils.getIdFromMinionId(pMinionId + "." + nr));
       taskDiv.append(taskSpan);
 
       div.append(taskDiv);
     }
 
-    let txt = "\nSummary for " + pMinionId;
-    txt += "\n------------";
-    const summarySpan = Route.createSpan("", txt);
-    summarySpan.style.color = "aqua";
-    div.append(summarySpan);
-
-    txt = "\nSucceeded: " + succeeded;
-    const succeededSpan = Route.createSpan("", txt);
-    succeededSpan.style.color = "lime";
-    div.append(succeededSpan);
-
-    if(changes > 0) {
-      txt = " (";
-      const oSpan = Route.createSpan("", txt);
-      oSpan.style.color = "white";
-      div.append(oSpan);
-
-      txt = "changed=" + changes;
-      const changedSpan = Route.createSpan("", txt);
-      changedSpan.style.color = "lime";
-      div.append(changedSpan);
-
-      txt = ")";
-      const cSpan = Route.createSpan("", txt);
-      cSpan.style.color = "white";
-      div.append(cSpan);
-    }
-
-    txt = "\nFailed:    " + failed;
-    const failedSpan = Route.createSpan("", txt);
-    if(failed > 0) {
-      failedSpan.style.color = "red";
+    if (Output.isOutputFormatAllowed("saltguihighstate")) {
+      OutputHighstateSummarySaltGui.addSummarySpan(div, succeeded, failed, skipped, totalMilliSeconds, changes, hidden);
     } else {
-      failedSpan.style.color = "aqua";
+      OutputHighstateSummaryOriginal.addSummarySpan(div, pMinionId, succeeded, failed, skipped, totalMilliSeconds, changes);
     }
-    div.append(failedSpan);
-
-    txt = "\n------------";
-    txt += "\nTotal states run: " + (succeeded + skipped + failed);
-    txt += "\nTotal run time: " + OutputHighstate._getDurationClauseSecs(totalMilliSeconds);
-    const totalsSpan = Route.createSpan("", txt);
-    totalsSpan.style.color = "aqua";
-    div.append(totalsSpan);
 
     return div;
   }
-
 }

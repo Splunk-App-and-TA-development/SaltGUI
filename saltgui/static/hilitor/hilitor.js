@@ -60,16 +60,16 @@ function Hilitor(start, id, tag)
     }
   };
 
-  this.setRegex = function(input)
+  this.setRegex = function(input, isCaseSensitive=false)
   {
     input = input.replace(endRegExp, "");
     input = input.replace(breakRegExp, "|");
     input = input.replace(/^\||\|$/g, "");
     if(input) {
-      var re = "(" + input + ")";
+      var re = "(?:" + input + ")";
       if(!this.openLeft) re = "\\b" + re;
       if(!this.openRight) re = re + "\\b";
-      matchRegExp = new RegExp(re, "i");
+      matchRegExp = new RegExp(re, isCaseSensitive ? "" : "i");
       return matchRegExp;
     }
     return false;
@@ -90,8 +90,8 @@ function Hilitor(start, id, tag)
     if(!matchRegExp) return;
     if(skipTags.test(node.nodeName)) return;
 
-    // dont highlight inside dropdown menus
-    if(node.classList && node.classList.contains("run-command-button")) return;
+    // don't highlight where we don't want it
+    if(node.classList && node.classList.contains("no-search")) return;
 
     if(node.hasChildNodes()) {
       for(var i=0; i < node.childNodes.length; i++)
@@ -100,7 +100,8 @@ function Hilitor(start, id, tag)
     if(node.nodeType == 3) { // NODE_TEXT
       // limit the number of highlighted matches to 25 otherwise the DOM grows rediculously
       // and performance drops with it. and it is still a good first indication.
-      if(this.nrHilites <= 25 && (nv = node.nodeValue) && (regs = matchRegExp.exec(nv))) {
+      let regs;
+      if(this.nrHilites <= 25 && (nv = node.nodeValue) && (regs = matchRegExp.exec(nv)) && regs[0].length > 0) {
         if(!wordColor[regs[0].toLowerCase()]) {
           wordColor[regs[0].toLowerCase()] = colors[colorIdx++ % colors.length];
         }
@@ -116,7 +117,7 @@ function Hilitor(start, id, tag)
 
         this.nrHilites++;
       }
-    };
+    }
   };
 
   // remove highlighting
@@ -124,6 +125,7 @@ function Hilitor(start, id, tag)
   {
     //var arr = document.getElementsByTagName(hiliteTag);
     var arr = targetNode.getElementsByTagName(hiliteTag);
+    let el;
     while(arr.length && (el = arr[0])) {
       var parent = el.parentNode;
       parent.replaceChild(el.firstChild, el);
@@ -133,11 +135,11 @@ function Hilitor(start, id, tag)
   };
 
   // start highlighting at target node
-  this.apply = function(input)
+  this.apply = function(input, isCaseSensitive=false)
   {
     this.remove();
     if(input === undefined || !input) return;
-    if(this.setRegex(input)) {
+    if(this.setRegex(input, isCaseSensitive)) {
       this.hiliteWords(targetNode);
     }
     return matchRegExp;
